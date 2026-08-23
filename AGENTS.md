@@ -102,6 +102,9 @@ M1 完成前不得宣称完整首页或完整主题详情已完成；所有结�
 
 - Git 基线与分支：PASS。
 - 主机侧 ArkTS 编译、signed HAP 构建、原 19 个测试及新增 M1 测试：PASS（30/30）。
-- `hvigor onDeviceTest`：NOT RUN（当前 HDC 与 DevEco Studio 均未发现真机）。
-- API 26 真机 M1 手工闭环：NOT RUN。
-- M1 总状态：NOT RUN（等待真机复验，不提前宣称完成）。
+- `hvigor onDeviceTest`：PASS（1/1）。
+- signed HAP 安装与启动：PASS。
+- API 26 真机 M1 手工闭环：PASS；默认正式首页、真实主题列表、Topic 605 匿名登录门控、临时官方登录回流及登录后同页 5 条回复均已验证。
+- 普通页面 Web 节点 0、Cookie 值泄露匹配 0、`UI_FALLBACK` 0、Fatal 0、POST 实现与执行 0：PASS。
+- M1 总状态：PASS。
+- P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除，后续范围须由新任务明确授权。

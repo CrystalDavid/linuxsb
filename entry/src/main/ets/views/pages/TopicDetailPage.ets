@@ -135,6 +135,8 @@ export struct TopicDetailPage {
         }
       }
       .width('100%')
+      .constraintSize({ minHeight: '100%' })
+      .justifyContent(FlexAlign.Start)
       .padding({ left: AppSpacing.MD, right: AppSpacing.MD, top: AppSpacing.MD, bottom: AppSpacing.XXL })
     }
     .width('100%')

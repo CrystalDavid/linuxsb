@@ -33,6 +33,14 @@ export struct HomePage {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
+          .gesture(
+            LongPressGesture({ repeat: false, duration: 1200 })
+              .onAction(() => {
+                if (this.debugAvailable) {
+                  this.onOpenDiagnostics();
+                }
+              })
+          )
 
         Text('非官方客户端')
           .fontSize(AppTypography.CAPTION)
@@ -40,6 +48,14 @@ export struct HomePage {
           .padding({ left: AppSpacing.SM, right: AppSpacing.SM, top: AppSpacing.XS, bottom: AppSpacing.XS })
           .backgroundColor($r('app.color.primary_soft'))
           .borderRadius(AppRadius.PILL)
+          .gesture(
+            LongPressGesture({ repeat: false, duration: 1200 })
+              .onAction(() => {
+                if (this.debugAvailable) {
+                  this.onTopicSelected(605);
+                }
+              })
+          )
       }
       .width('100%')
 
@@ -51,14 +67,6 @@ export struct HomePage {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding({ left: AppSpacing.MD, right: AppSpacing.MD, top: AppSpacing.XL, bottom: AppSpacing.MD })
-    .gesture(
-      LongPressGesture({ repeat: false, duration: 1200 })
-        .onAction(() => {
-          if (this.debugAvailable) {
-            this.onOpenDiagnostics();
-          }
-        })
-    )
   }
 
   @Builder
