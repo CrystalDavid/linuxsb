@@ -2,7 +2,7 @@
 
 > 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
 
-> 阶段状态（2026-08-23）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 授权 UI 移植、只读性能实现和 Pura 90（API 24）模拟器回归已完成；最终 API 26 真机复验与登录后详情视觉证据仍为 NOT RUN，因此 M2-R1 完整里程碑尚未关闭。已验证的 RCP、协议解码、TaskPool、临时 ArkWeb 登录与 Cookie 内存桥接架构继续冻结；真实写操作继续为 NOT RUN。
+> 阶段状态（2026-08-23）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 授权 UI 移植、只读性能实现、Pura 90（API 24）模拟器回归以及 API 26 真机 signed HAP、登录和回复视觉复验已经完成。严格验收仍为 FAIL：模拟器冷正文目标仅 3/5 达标，认证高回复 Topic 15365 出现 `REPLY_STRUCTURE_MISMATCH`；DevEco ArkUI Inspector 为 NOT RUN。已验证的 RCP、协议解码、TaskPool、临时 ArkWeb 登录与 Cookie 内存桥接架构继续冻结；真实写操作继续为 NOT RUN。
 
 ## 1. 产品定义
 
@@ -122,7 +122,7 @@ M1 阶段门已经通过；后续仍不得在没有新任务明确授权时扩�
 - 保留烧饼社区自己的品牌、BBS1 数据协议、RCP 网络、TaskPool、临时 ArkWeb 登录和 Cookie 内存桥接。
 - 上游 UI 对 Discourse 业务模型的依赖必须改为本项目的 Presentation Adapter 和 UI Model，不迁入 Discourse TopicService 或业务模型。
 - 不迁入 ArkWebNetworkBridge、Challenge/Cloudflare、MessageBus、Presence、Push、DoH、Boost、Reaction、Poll、LDC Credit 或 LinuxDO 等级/品牌逻辑。
-- 当前分支为 `m2/arkdo-authorized-ui-port`；授权边界 checkpoint、UI 移植、性能优化和 Pura 90 模拟器回归为 PASS。最终 API 26 真机复验与登录后详情视觉证据为 NOT RUN。
+- 当前分支为 `m2/arkdo-authorized-ui-port`；授权边界 checkpoint、UI 移植、性能优化、Pura 90 模拟器回归和 API 26 真机核心闭环复验为 PASS。高回复主题兼容性为 FAIL，DevEco ArkUI Inspector 为 NOT RUN，因此完整里程碑严格记为 FAIL。
 
 ### 2.6 M2-R1 实现与验收状态
 
@@ -139,13 +139,18 @@ M1 阶段门已经通过；后续仍不得在没有新任务明确授权时扩�
 | 热缓存正文 | PASS | 5 次：中位 35 ms，最大 51 ms；目标不超过 250 ms |
 | 冷请求正文 | FAIL | 5 次中 3 次不超过 1500 ms；中位 1170 ms，最大 1871 ms；两次超标对应网络 1731/1827 ms，不是解码或 UI 阶段 |
 | TaskPool 解码 | PASS | 冷开中位 13 ms，最大 16 ms；请求计数最大 1；first-byte 指标当前 RCP 接口不可获得 |
-| 安全回归 | PASS | Cookie 泄露 0、`UI_FALLBACK` 0、Fatal 0、HTTP POST 0；Web 构造器只在官方登录页 |
+| 安全回归 | PASS | 模拟器与 API 26 真机均为 Cookie 泄露 0、`UI_FALLBACK` 0、Fatal 0、HTTP POST 0；真机最终进程日志 783 行；Web 构造器只在官方登录页 |
 | DevEco ArkUI Inspector | NOT RUN | 桌面窗口焦点不稳定；已用 TestKit 与 `dumpLayout` 完成组件层级、抽屉边界、无效空白和普通页面 Web 节点检查 |
-| 登录后主题详情视觉 | NOT RUN | Pura 90 当前没有登录会话；不得自动输入或暴露账号凭据 |
-| API 26 真机复验 | NOT RUN | 已知真机 TCP 目标当前为 Offline；未向不明确目标安装 |
+| API 26 真机 signed HAP | PASS | SGT-AL10、API 26；`entry-default-signed.hap` 为 978011 bytes，SHA-256 `78E7B48443BC7835A089DE9D4B3811D085C4F724940D7596DBD5EA019A471B44`；覆盖安装、启动和进程检查成功 |
+| API 26 真机首页与匿名主题 | PASS | 深色首页首屏约 11 条真实主题；匿名主题主楼和登录门控可见；普通页面 Web 节点 0；匿名主题内容约 506 ms，其中网络约 443 ms、解码约 37 ms、请求数 1 |
+| 临时官方登录与返回 | PASS | 登录期间只有一个可见临时 Web；关闭后返回原 Topic 15365 并发出认证 RCP GET；普通主题页面 Web 节点恢复为 0 |
+| 登录后主题详情视觉 | PASS | 认证 Topic 15458 得到 `CONTENT`，约 419 ms、请求数 1；页面声明 35 条回复，滚动后的语义节点连续为楼层 1～4，登录门控 0、Web 节点 0 |
+| 进程重启会话隔离 | PASS | 杀进程重启后正式首页恢复 20 个可定位主题项；再次进入主题显示匿名登录门控、回复节点 0、Web 节点 0，内存 RCP 会话未恢复 |
+| 高回复主题兼容性 | FAIL | 登录返回的 Topic 15365 声明 75 条回复；认证 GET 完成后得到 `REPLY_STRUCTURE_MISMATCH`。本轮未猜分页路由、未补造回复、未执行 POST，留待独立协议契约调查 |
+| M2-R1 完整里程碑 | FAIL | 授权 UI、立即导航、缓存、去重、模拟器和真机核心闭环已完成；冷正文目标与高回复主题兼容性未全部通过，ArkUI Inspector 仍为 NOT RUN |
 | P0-8 写操作 | NOT RUN | FAB 与回复栏保持禁用；没有 POST 实现或请求 |
 
-M2-R1 当前实现与模拟器回归可以作为候选版本；完整里程碑必须等待 API 26 真机重新 Connected 后，再补一次官方登录返回原主题、登录后回复 UI、Web 节点、日志脱敏、signed HAP 真机启动和 DevEco ArkUI Inspector 复验。P0、P0-B 与 M1 的历史结论不受本节影响。
+M2-R1 的授权 UI、主题打开优化和 API 26 真机核心闭环已经形成可复验候选版本，但完整里程碑严格记为 FAIL，不以局部 PASS 掩盖冷网络超标和高回复主题结构不兼容。后续如获新任务，应先对 Topic 15365 做独立、只读的版本化协议契约调查，再决定是否支持分页；不得猜测路由或执行 POST。DevEco ArkUI Inspector 仍需在桌面交互环境稳定时单独复验。P0、P0-B 与 M1 的历史结论不受本节影响。
 
 ## 3. 协议适配原则
 

@@ -121,8 +121,12 @@ ArkDO 固定提交的授权 UI
 - M2-R1 授权 UI 移植、真实首页字段、Presentation Adapter、共享 Session、主题缓存、在途去重和受控预取：PASS。
 - Pura 90（API 24）功能、深浅色、语义 UI、signed HAP 安装启动与安全回归：PASS。
 - Pura 90 主题打开：页面/骨架首帧最大 44 ms、热缓存正文最大 51 ms、TaskPool 解码最大 16 ms：PASS；冷正文 1500 ms 目标为 3/5，另外两次由 1731/1827 ms 网络阶段导致：FAIL（已与解码耗时分开记录）。
-- M2-R1 登录后主题详情视觉复验：NOT RUN（模拟器未建立登录会话）。
+- M2-R1 API 26 真机 signed HAP 安装、启动、正式首页、匿名主题和临时官方登录：PASS；首页与普通主题页 Web 节点均为 0。
+- M2-R1 登录返回与认证会话桥接：PASS；临时 ArkWeb 关闭后返回原主题并发出认证 RCP GET，没有使用 ArkWeb 数据桥。
+- M2-R1 登录后回复视觉：PASS（Topic 15458）；页面声明 35 条回复，滚动视口语义节点连续显示楼层 1～4，登录门控 0、普通页面 Web 节点 0。
+- 真机进程重启会话隔离：PASS；重启后正式首页恢复，进入主题重新显示匿名登录门控，内存 RCP 会话没有持久化恢复。
+- 高回复主题兼容性：FAIL（Topic 15365）；认证 GET 成功返回后解码结果为 `REPLY_STRUCTURE_MISMATCH`。本轮不猜分页路由、不执行 POST，也不把协议修订混入 UI 里程碑。
+- 真机最终进程日志：PASS；783 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、HTTP POST 0。
 - DevEco ArkUI Inspector 交互检查：NOT RUN（本轮桌面窗口焦点不稳定）；已用 TestKit 与 `dumpLayout` 完成组件层级、空白、抽屉边界和普通页面 Web 节点检查。
-- API 26 真机里程碑复验：NOT RUN（当前真机 HDC 目标 Offline，禁止误装或伪报）。
-- M2-R1 完整里程碑关闭：NOT RUN；待完成真机、登录视觉与 Inspector 证据后再判定。
+- M2-R1 完整里程碑关闭：FAIL；授权 UI 和核心性能实现已完成，但冷正文目标与高回复主题兼容性未全部通过，且 ArkUI Inspector 为 NOT RUN。到此停止，不自行扩展协议或写操作。
 - P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。
