@@ -1,11 +1,11 @@
-import { P0ProbePage } from '../views/pages/P0ProbePage';
+import { RootPage } from '../views/pages/RootPage';
 
 @Entry
 @Component
 struct Index {
   build() {
     Stack() {
-      P0ProbePage()
+      RootPage()
     }
     .width('100%')
     .height('100%')
