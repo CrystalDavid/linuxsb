@@ -2,7 +2,7 @@
 
 > 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
 
-> 阶段状态（2026-08-23）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 已建立“授权移植 ArkDO 核心 UI 与修复主题打开延迟”的安全基线，UI 移植和性能验收当前为 NOT RUN。已验证的 RCP、协议解码、TaskPool、临时 ArkWeb 登录与 Cookie 内存桥接架构继续冻结；真实写操作继续为 NOT RUN。
+> 阶段状态（2026-08-23）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 授权 UI 移植、只读性能实现和 Pura 90（API 24）模拟器回归已完成；最终 API 26 真机复验与登录后详情视觉证据仍为 NOT RUN，因此 M2-R1 完整里程碑尚未关闭。已验证的 RCP、协议解码、TaskPool、临时 ArkWeb 登录与 Cookie 内存桥接架构继续冻结；真实写操作继续为 NOT RUN。
 
 ## 1. 产品定义
 
@@ -122,7 +122,30 @@ M1 阶段门已经通过；后续仍不得在没有新任务明确授权时扩�
 - 保留烧饼社区自己的品牌、BBS1 数据协议、RCP 网络、TaskPool、临时 ArkWeb 登录和 Cookie 内存桥接。
 - 上游 UI 对 Discourse 业务模型的依赖必须改为本项目的 Presentation Adapter 和 UI Model，不迁入 Discourse TopicService 或业务模型。
 - 不迁入 ArkWebNetworkBridge、Challenge/Cloudflare、MessageBus、Presence、Push、DoH、Boost、Reaction、Poll、LDC Credit 或 LinuxDO 等级/品牌逻辑。
-- 当前分支为 `m2/arkdo-authorized-ui-port`；授权边界 checkpoint 为 PASS，UI 移植、性能优化和模拟器验收为 NOT RUN。
+- 当前分支为 `m2/arkdo-authorized-ui-port`；授权边界 checkpoint、UI 移植、性能优化和 Pura 90 模拟器回归为 PASS。最终 API 26 真机复验与登录后详情视觉证据为 NOT RUN。
+
+### 2.6 M2-R1 实现与验收状态
+
+| 项目 | 状态 | 核心证据 |
+| --- | --- | --- |
+| 固定上游 | PASS | `C:\Code\ArkDO` HEAD 为 `7680996437b3b877aa5c69ac2f55529297a2ea52` |
+| 授权 UI 基础设施与组件 | PASS | 主题、沉浸标题、浮动布局、头像、标签、抽屉、主题正文和禁用输入栏已适配到本项目模型 |
+| 首页真实字段与 Adapter | PASS | tokenizer/状态机扩展作者、头像、回复、时间和状态；缺失字段不伪造；协议对象不直接进入 UI |
+| 主题打开架构 | PASS | 立即 push、摘要首帧、骨架屏、单例 RCP Session、Product 缓存策略、20 条/2 分钟内存缓存、认证分区、在途去重、最多 3 条/并发 2 的受控预取 |
+| 单元测试 | PASS | 44/44，Failure 0，Error 0 |
+| Pura 90 设备测试 | PASS | API 24；onDeviceTest 5/5；signed HAP 构建、覆盖安装、启动和进程检查成功 |
+| 首页/抽屉/匿名主题视觉 | PASS | 深浅色通过；首页首屏约 10 条；抽屉 288vp；匿名主题显示主楼与登录门控；普通 UI Web 节点 0 |
+| 页面/骨架首帧 | PASS | 5 次冷开：中位 32 ms，最大 44 ms；目标不超过 100 ms |
+| 热缓存正文 | PASS | 5 次：中位 35 ms，最大 51 ms；目标不超过 250 ms |
+| 冷请求正文 | FAIL | 5 次中 3 次不超过 1500 ms；中位 1170 ms，最大 1871 ms；两次超标对应网络 1731/1827 ms，不是解码或 UI 阶段 |
+| TaskPool 解码 | PASS | 冷开中位 13 ms，最大 16 ms；请求计数最大 1；first-byte 指标当前 RCP 接口不可获得 |
+| 安全回归 | PASS | Cookie 泄露 0、`UI_FALLBACK` 0、Fatal 0、HTTP POST 0；Web 构造器只在官方登录页 |
+| DevEco ArkUI Inspector | NOT RUN | 桌面窗口焦点不稳定；已用 TestKit 与 `dumpLayout` 完成组件层级、抽屉边界、无效空白和普通页面 Web 节点检查 |
+| 登录后主题详情视觉 | NOT RUN | Pura 90 当前没有登录会话；不得自动输入或暴露账号凭据 |
+| API 26 真机复验 | NOT RUN | 已知真机 TCP 目标当前为 Offline；未向不明确目标安装 |
+| P0-8 写操作 | NOT RUN | FAB 与回复栏保持禁用；没有 POST 实现或请求 |
+
+M2-R1 当前实现与模拟器回归可以作为候选版本；完整里程碑必须等待 API 26 真机重新 Connected 后，再补一次官方登录返回原主题、登录后回复 UI、Web 节点、日志脱敏、signed HAP 真机启动和 DevEco ArkUI Inspector 复验。P0、P0-B 与 M1 的历史结论不受本节影响。
 
 ## 3. 协议适配原则
 

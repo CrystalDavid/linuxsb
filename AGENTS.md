@@ -118,5 +118,11 @@ ArkDO 固定提交的授权 UI
 - ArkDO 固定提交及指定 UI 文件可读取：PASS。
 - 签名配置与 `artifacts/` 隔离：PASS。
 - M2-R1 授权边界文档 checkpoint：PASS。
-- M2-R1 UI 移植、数据扩展、性能实现与模拟器验收：NOT RUN。
+- M2-R1 授权 UI 移植、真实首页字段、Presentation Adapter、共享 Session、主题缓存、在途去重和受控预取：PASS。
+- Pura 90（API 24）功能、深浅色、语义 UI、signed HAP 安装启动与安全回归：PASS。
+- Pura 90 主题打开：页面/骨架首帧最大 44 ms、热缓存正文最大 51 ms、TaskPool 解码最大 16 ms：PASS；冷正文 1500 ms 目标为 3/5，另外两次由 1731/1827 ms 网络阶段导致：FAIL（已与解码耗时分开记录）。
+- M2-R1 登录后主题详情视觉复验：NOT RUN（模拟器未建立登录会话）。
+- DevEco ArkUI Inspector 交互检查：NOT RUN（本轮桌面窗口焦点不稳定）；已用 TestKit 与 `dumpLayout` 完成组件层级、空白、抽屉边界和普通页面 Web 节点检查。
+- API 26 真机里程碑复验：NOT RUN（当前真机 HDC 目标 Offline，禁止误装或伪报）。
+- M2-R1 完整里程碑关闭：NOT RUN；待完成真机、登录视觉与 Inspector 证据后再判定。
 - P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。
