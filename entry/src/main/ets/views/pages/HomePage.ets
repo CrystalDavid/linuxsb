@@ -401,6 +401,8 @@ export struct HomePage {
             categories: this.categories,
             selectedSort: this.draftSort,
             selectedCategoryId: this.draftCategoryId,
+            appliedSort: this.appliedSort,
+            appliedCategoryId: this.appliedCategoryId,
             showFeatured: this.hasFeatured(),
             onSortChange: (sort: HomeFeedSort) => { this.draftSort = sort; },
             onCategoryChange: (categoryId: number) => { this.draftCategoryId = categoryId; },

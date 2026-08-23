@@ -20,10 +20,15 @@ class TopicOpenTraceSnapshot {
   firstByteAt: number = 0;
   bodyCompleteAt: number = 0;
   taskPoolSubmitAt: number = 0;
+  decodeStartAt: number = 0;
+  decodeEndAt: number = 0;
   decodeCompleteAt: number = 0;
+  mappingEnd: number = 0;
   mappingCompleteAt: number = 0;
+  firstTextFrameAt: number = 0;
   firstContentFrameAt: number = 0;
   imageRequestsStartAt: number = 0;
+  firstImageFrameAt: number = 0;
   networkRequestCount: number = 0;
   result: string = 'RUNNING';
 }
@@ -111,29 +116,36 @@ export class TopicOpenTrace {
       return;
     }
     TopicOpenTrace.mark('taskPoolSubmitAt');
+    TopicOpenTrace.mark('decodeStartAt');
   }
 
   static markDecodeComplete(topicId: number): void {
     if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
       return;
     }
-    TopicOpenTrace.mark('decodeCompleteAt');
+    TopicOpenTrace.mark('decodeEndAt');
   }
 
   static markMappingComplete(topicId: number): void {
     if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
       return;
     }
-    TopicOpenTrace.mark('mappingCompleteAt');
+    TopicOpenTrace.mark('mappingEnd');
   }
 
   static markFirstContentFrame(): void {
+    TopicOpenTrace.markOnce('firstTextFrameAt');
     TopicOpenTrace.markOnce('firstContentFrameAt');
-    TopicOpenTrace.complete('CONTENT');
+    TopicOpenTrace.emit('CONTENT');
   }
 
   static markImageRequestsStart(): void {
     TopicOpenTrace.markOnce('imageRequestsStartAt');
+  }
+
+  static markFirstImageFrame(): void {
+    TopicOpenTrace.markOnce('firstImageFrameAt');
+    TopicOpenTrace.emit('IMAGE');
   }
 
   static fail(result: string): void {
@@ -162,9 +174,13 @@ export class TopicOpenTrace {
       snapshot.bodyCompleteAt = now;
     } else if (field === 'taskPoolSubmitAt') {
       snapshot.taskPoolSubmitAt = now;
-    } else if (field === 'decodeCompleteAt') {
+    } else if (field === 'decodeStartAt') {
+      snapshot.decodeStartAt = now;
+    } else if (field === 'decodeEndAt') {
+      snapshot.decodeEndAt = now;
       snapshot.decodeCompleteAt = now;
-    } else if (field === 'mappingCompleteAt') {
+    } else if (field === 'mappingEnd') {
+      snapshot.mappingEnd = now;
       snapshot.mappingCompleteAt = now;
     }
     TopicOpenTrace.logEvent(field, now);
@@ -178,12 +194,18 @@ export class TopicOpenTrace {
     if (field === 'skeletonFrameAt' && snapshot.skeletonFrameAt === 0) {
       snapshot.skeletonFrameAt = Date.now();
       TopicOpenTrace.logEvent(field, snapshot.skeletonFrameAt);
+    } else if (field === 'firstTextFrameAt' && snapshot.firstTextFrameAt === 0) {
+      snapshot.firstTextFrameAt = Date.now();
+      TopicOpenTrace.logEvent(field, snapshot.firstTextFrameAt);
     } else if (field === 'firstContentFrameAt' && snapshot.firstContentFrameAt === 0) {
       snapshot.firstContentFrameAt = Date.now();
       TopicOpenTrace.logEvent(field, snapshot.firstContentFrameAt);
     } else if (field === 'imageRequestsStartAt' && snapshot.imageRequestsStartAt === 0) {
       snapshot.imageRequestsStartAt = Date.now();
       TopicOpenTrace.logEvent(field, snapshot.imageRequestsStartAt);
+    } else if (field === 'firstImageFrameAt' && snapshot.firstImageFrameAt === 0) {
+      snapshot.firstImageFrameAt = Date.now();
+      TopicOpenTrace.logEvent(field, snapshot.firstImageFrameAt);
     }
   }
 
@@ -195,6 +217,15 @@ export class TopicOpenTrace {
     snapshot.result = result;
     hilog.info(TRACE_DOMAIN, TRACE_TAG, '[M2R1_TRACE] %{public}s', JSON.stringify(snapshot));
     TopicOpenTrace.active = undefined;
+  }
+
+  private static emit(result: string): void {
+    const snapshot = TopicOpenTrace.active;
+    if (snapshot === undefined) {
+      return;
+    }
+    snapshot.result = result;
+    hilog.info(TRACE_DOMAIN, TRACE_TAG, '[M2R1_TRACE] %{public}s', JSON.stringify(snapshot));
   }
 
   private static logEvent(stage: string, at: number): void {

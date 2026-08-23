@@ -48,6 +48,16 @@ export struct RootTabPage {
     }
   }
 
+  private openDebugTopic(topicId: number): void {
+    if (!this.debugPackage || topicId <= 0) {
+      return;
+    }
+    const topic = new TopicUiModel();
+    topic.topicId = topicId;
+    topic.title = `Topic ${topicId}`;
+    this.openTopic(topic);
+  }
+
   private requestHomeLogin(): void {
     if (this.authenticated) {
       try {
@@ -90,7 +100,9 @@ export struct RootTabPage {
       .backgroundColor(SemanticColors.page())
     } else if (routeName === DIAGNOSTICS_ROUTE && this.debugPackage) {
       NavDestination() {
-        P0ProbePage()
+        P0ProbePage({
+          onOpenFormalTopic: (topicId: number) => this.openDebugTopic(topicId)
+        })
       }
       .title('P0 开发诊断')
       .backgroundColor(SemanticColors.page())

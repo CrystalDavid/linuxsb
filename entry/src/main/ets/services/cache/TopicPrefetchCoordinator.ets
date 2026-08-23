@@ -8,7 +8,7 @@ export class TopicPrefetchCoordinator {
   private generation: number = 0;
   private startDelayMs: number;
 
-  constructor(source: TopicPrefetchPort, startDelayMs: number = 240) {
+  constructor(source: TopicPrefetchPort, startDelayMs: number = 500) {
     this.source = source;
     this.startDelayMs = Math.max(0, startDelayMs);
   }

@@ -1,3 +1,5 @@
+import { common } from '@kit.AbilityKit';
+import { fileIo } from '@kit.CoreFileKit';
 import { LoginProbePage } from '../../services/auth/LoginProbePage';
 import { AuthenticatedSessionProbeResult, SessionProbe } from '../../services/auth/SessionProbe';
 import { ProbeDecodeTaskRunner } from '../../services/protocol/ProbeDecodeTask';
@@ -7,7 +9,7 @@ import {
   ReplyProbeSummary,
   TopicStructureProbeResult
 } from '../../services/protocol/ProbeModels';
-import { CookieProbeSummary, cookieSessionBroker } from '../../services/transport/CookieSessionBroker';
+import { CookieProbeSummary, cookieSessionBroker } from '../../services/auth/CookieSessionBroker';
 import { TransportProbeResponse } from '../../services/transport/ForumTransport';
 import { RcpForumTransport } from '../../services/transport/RcpForumTransport';
 import { TransportCachePolicy } from '../../services/transport/ForumTransport';
@@ -15,6 +17,7 @@ import { DisabledWriteContractProbe } from '../../services/transport/WriteContra
 
 @Component
 export struct P0ProbePage {
+  onOpenFormalTopic: (topicId: number) => void = () => {};
   private transport: RcpForumTransport = new RcpForumTransport();
   private decodeRunner: ProbeDecodeTaskRunner = new ProbeDecodeTaskRunner();
   private writeProbe: DisabledWriteContractProbe = new DisabledWriteContractProbe();
@@ -47,6 +50,7 @@ export struct P0ProbePage {
   @State private authenticatedTopicParse: string = '尚未解析';
   @State private authenticatedTopicStructure: string = '尚未扫描结构';
   @State private authenticatedTopicWarnings: string = '';
+  @State private authenticatedSnapshotStatus: string = '登录后 HTML 快照：NOT RUN';
   @State private topicComparison: string = '匿名与登录后响应尚未完成比较';
 
   private anonymousTopicSha256: string = '';
@@ -191,13 +195,14 @@ export struct P0ProbePage {
         this.authenticatedTopicOutcome = `FAIL · ${response.error.kind}`;
         return;
       }
+      this.authenticatedSnapshotStatus = this.saveAuthenticatedTopicSnapshot(topicId, response.body);
       const decoded: BackgroundProbeDecodeResult = await this.decodeRunner.decode('topic', response.body,
         response.metadata.byteLength, topicId);
       if (decoded.topic === undefined || decoded.topicStructure === undefined) {
         this.authenticatedTopicOutcome = 'FAIL · PROBE_RESULT_MISSING';
         return;
       }
-      this.authenticatedTopicCounts = `主楼 ID ${decoded.topic.mainPostId} · 页面声明回复 ${decoded.topic.advertisedReplyCount} · 本响应含回复 ${decoded.topic.replies.length}`;
+      this.authenticatedTopicCounts = `主楼 ID ${decoded.topic.mainPostId} · 页面声明回复 ${decoded.topic.advertisedReplyCount} · 本响应含回复 ${decoded.topic.replies.length} · 第 ${decoded.topic.currentPage} / ${decoded.topic.totalPages} 页`;
       this.authenticatedTopicReplyContract = this.formatReplyContract(decoded.topic.replies,
         decoded.topic.mainPostId);
       this.authenticatedTopicParse = this.formatParse(decoded.execution, decoded.parseMs, decoded.inputBytes,
@@ -209,12 +214,14 @@ export struct P0ProbePage {
       this.authenticatedTopicBytes = response.metadata.byteLength;
       this.authenticatedTopicMarkers = this.structureMarkerCount(decoded.topicStructure);
       this.refreshTopicComparison();
-      const repliesMatch = decoded.topic.advertisedReplyCount === decoded.topic.replies.length;
+      const repliesMatch = decoded.topic.advertisedReplyCount === decoded.topic.replies.length ||
+        (decoded.topic.nextPageUrl.length > 0 && decoded.topic.replies.length > 0);
       const replyContractMatches = this.replyContractMatches(decoded.topic.replies, decoded.topic.mainPostId);
       const fingerprintReady = response.metadata.sha256.length === 64;
       if (decoded.topic.protocolMatched && repliesMatch && replyContractMatches &&
-        decoded.topic.warnings.length === 0 && decoded.execution === 'TASKPOOL' && fingerprintReady) {
-        this.authenticatedTopicOutcome = 'PASS · SAME_PAGE_REPLIES';
+        !this.hasFatalTopicWarning(decoded.topic.warnings) && decoded.execution === 'TASKPOOL' && fingerprintReady) {
+        this.authenticatedTopicOutcome = decoded.topic.nextPageUrl.length > 0 ?
+          'PASS · PAGED_REPLY_PAGE' : 'PASS · SAME_PAGE_REPLIES';
       } else if (!decoded.topic.protocolMatched) {
         this.authenticatedTopicOutcome = 'FAIL · PROTOCOL_MISMATCH';
       } else if (decoded.execution !== 'TASKPOOL') {
@@ -278,6 +285,7 @@ export struct P0ProbePage {
     this.authenticatedTopicParse = '尚未解析';
     this.authenticatedTopicStructure = '尚未扫描结构';
     this.authenticatedTopicWarnings = '';
+    this.authenticatedSnapshotStatus = '登录后 HTML 快照：NOT RUN';
     this.authenticatedTopicSha256 = '';
     this.authenticatedTopicBytes = -1;
     this.authenticatedTopicMarkers = -1;
@@ -309,6 +317,27 @@ export struct P0ProbePage {
     return result;
   }
 
+  private saveAuthenticatedTopicSnapshot(topicId: number, body: string): string {
+    if (topicId !== 15365 || body.length === 0) {
+      return '登录后 HTML 快照：仅 Topic 15365 的非空响应会保存';
+    }
+    const fileName = 'm2-r1-1-topic-15365-authenticated.html';
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const snapshot = fileIo.openSync(`${context.cacheDir}/${fileName}`,
+        fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      try {
+        fileIo.writeSync(snapshot.fd, body);
+        fileIo.fsyncSync(snapshot.fd);
+      } finally {
+        fileIo.closeSync(snapshot);
+      }
+      return `登录后 HTML 快照：PASS · ${fileName} · ${body.length} chars`;
+    } catch (_) {
+      return '登录后 HTML 快照：FAIL · CACHE_WRITE_ERROR';
+    }
+  }
+
   private formatTransport(response: TransportProbeResponse, bbsVersion: string = ''): string {
     const metadata = response.metadata;
     const error = response.error === undefined ? '' : ` · ${response.error.kind}(${response.error.code})`;
@@ -333,6 +362,15 @@ export struct P0ProbePage {
       replyIds.add(reply.replyId);
     }
     return replies.length > 0;
+  }
+
+  private hasFatalTopicWarning(warnings: string[]): boolean {
+    for (let index = 0; index < warnings.length; index++) {
+      if (!warnings[index].startsWith('REPLIES_PAGED:')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private formatReplyContract(replies: ReplyProbeSummary[], mainPostId: number): string {
@@ -449,6 +487,10 @@ export struct P0ProbePage {
             TextInput({ text: this.topicIdText, placeholder: '公开主题 ID' })
               .onChange((value: string) => this.topicIdText = value)
               .width('100%')
+            Button('用正式原生页面打开当前主题')
+              .id('diagnostics-open-formal-topic')
+              .enabled(this.parseTopicId(this.topicIdText) > 0)
+              .onClick(() => this.onOpenFormalTopic(this.parseTopicId(this.topicIdText)))
             Text(this.topicOutcome).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
             Text(this.topicTransport).fontSize(12).fontColor('#475467').width('100%')
             Text(this.topicParse).fontSize(12).fontColor('#475467').width('100%')
@@ -474,6 +516,7 @@ export struct P0ProbePage {
             Text(this.authenticatedTopicReplyContract).fontSize(12).fontColor('#475467').width('100%')
             Text(this.authenticatedTopicParse).fontSize(12).fontColor('#475467').width('100%')
             Text(this.authenticatedTopicStructure).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedSnapshotStatus).fontSize(12).fontColor('#475467').width('100%')
             if (this.authenticatedTopicWarnings.length > 0) {
               Text(this.authenticatedTopicWarnings).fontSize(11).fontColor('#B54708').width('100%')
             }
