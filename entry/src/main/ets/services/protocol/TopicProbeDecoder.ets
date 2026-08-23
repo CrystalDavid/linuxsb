@@ -5,12 +5,15 @@ import { collapseWhitespace, hasClass, parseFirstUnsigned, parsePrefixedId } fro
 class PostDraft {
   postId: number = 0;
   floor: number = 0;
+  author: string = '';
+  bodyText: string = '';
 }
 
 export class TopicProbeDecoder {
   decode(html: string, expectedTopicId: number = 0): TopicProbeResult {
     const warnings: string[] = [];
     const replies: ReplyProbeSummary[] = [];
+    const replyIds = new Set<number>();
     const statValues: number[] = [];
     let title = '';
     let titleDepth = 0;
@@ -20,6 +23,12 @@ export class TopicProbeDecoder {
     let statText = '';
     let floorDepth = 0;
     let floorText = '';
+    let authorDepth = 0;
+    let authorText = '';
+    let contentDepth = 0;
+    let contentText = '';
+    let postListItemDepth = 0;
+    let loginVisibleMarkerCount = 0;
     let currentPost: PostDraft | undefined = undefined;
     let mainPostId = 0;
 
@@ -44,14 +53,30 @@ export class TopicProbeDecoder {
           statSpanDepth++;
         }
 
-        if (token.name === 'li' && hasClass(token.attributes, 'post-entry')) {
-          this.finalizePost(currentPost, replies, warnings, mainPostId);
+        if (hasClass(token.attributes, 'replies-login-visible') || token.attributes.has('data-replies-login-visible')) {
+          loginVisibleMarkerCount++;
+        }
+
+        if (token.name === 'li' && hasClass(token.attributes, 'post-entry') && currentPost === undefined) {
           currentPost = new PostDraft();
+          postListItemDepth = 1;
           currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
           currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
           if (mainPostId === 0 && currentPost.postId > 0) {
             mainPostId = currentPost.postId;
           }
+        } else if (currentPost !== undefined && token.name === 'li' && !token.selfClosing) {
+          postListItemDepth++;
+        }
+        if (currentPost !== undefined && token.name === 'a' && hasClass(token.attributes, 'post-author')) {
+          authorDepth = 1;
+          authorText = '';
+        }
+        if (currentPost !== undefined && token.name === 'div' && hasClass(token.attributes, 'post-content') && contentDepth === 0) {
+          contentDepth = 1;
+          contentText = '';
+        } else if (contentDepth > 0 && token.name === 'div') {
+          contentDepth++;
         }
         if (currentPost !== undefined && (hasClass(token.attributes, 'post-floor') || hasClass(token.attributes, 'post-number'))) {
           floorDepth = 1;
@@ -71,6 +96,12 @@ export class TopicProbeDecoder {
         }
         if (floorDepth > 0) {
           floorText += token.text;
+        }
+        if (authorDepth > 0) {
+          authorText += token.text;
+        }
+        if (contentDepth > 0 && contentText.length < 512) {
+          contentText += token.text.substring(0, 512 - contentText.length);
         }
         return;
       }
@@ -99,13 +130,30 @@ export class TopicProbeDecoder {
           currentPost.floor = parseFirstUnsigned(collapseWhitespace(floorText));
         }
       }
+      if (authorDepth > 0 && token.name === 'a') {
+        authorDepth = 0;
+        if (currentPost !== undefined) {
+          currentPost.author = collapseWhitespace(authorText);
+        }
+      }
+      if (contentDepth > 0 && token.name === 'div') {
+        contentDepth--;
+        if (contentDepth === 0 && currentPost !== undefined) {
+          currentPost.bodyText = collapseWhitespace(contentText);
+        }
+      }
       if (token.name === 'li' && currentPost !== undefined) {
-        this.finalizePost(currentPost, replies, warnings, mainPostId);
-        currentPost = undefined;
+        postListItemDepth--;
+        if (postListItemDepth === 0) {
+          this.finalizePost(currentPost, replies, replyIds, warnings, mainPostId);
+          currentPost = undefined;
+          authorDepth = 0;
+          contentDepth = 0;
+        }
       }
     });
 
-    this.finalizePost(currentPost, replies, warnings, mainPostId);
+    this.finalizePost(currentPost, replies, replyIds, warnings, mainPostId);
     const viewCount = statValues.length > 0 ? statValues[0] : 0;
     const advertisedReplyCount = statValues.length > 1 ? statValues[1] : replies.length;
     if (title.length === 0) {
@@ -119,6 +167,13 @@ export class TopicProbeDecoder {
     }
     if (advertisedReplyCount > replies.length) {
       warnings.push(`REPLIES_NOT_PRESENT_IN_RESPONSE:${advertisedReplyCount - replies.length}`);
+      if (replies.length === 0 && loginVisibleMarkerCount > 0) {
+        warnings.push(`REPLIES_LOGIN_GATED:${advertisedReplyCount}`);
+      } else if (replies.length === 0) {
+        warnings.push('REPLY_STRUCTURE_MISMATCH');
+      }
+    } else if (advertisedReplyCount < replies.length) {
+      warnings.push(`REPLY_COUNT_MISMATCH:${advertisedReplyCount}:${replies.length}`);
     }
     return {
       protocolMatched: title.length > 0 && mainPostId > 0 && (expectedTopicId <= 0 || expectedTopicId === mainPostId),
@@ -131,13 +186,24 @@ export class TopicProbeDecoder {
     };
   }
 
-  private finalizePost(post: PostDraft | undefined, replies: ReplyProbeSummary[], warnings: string[], mainPostId: number): void {
+  private finalizePost(post: PostDraft | undefined, replies: ReplyProbeSummary[], replyIds: Set<number>, warnings: string[], mainPostId: number): void {
     if (post === undefined || post.postId <= 0 || post.postId === mainPostId) {
+      return;
+    }
+    if (replyIds.has(post.postId)) {
+      warnings.push(`DUPLICATE_REPLY_ID:${post.postId}`);
       return;
     }
     if (post.floor <= 0) {
       warnings.push(`REPLY_FLOOR_MISSING:${post.postId}`);
     }
-    replies.push({ replyId: post.postId, floor: post.floor });
+    if (post.author.length === 0) {
+      warnings.push(`REPLY_AUTHOR_MISSING:${post.postId}`);
+    }
+    if (post.bodyText.length === 0) {
+      warnings.push(`REPLY_BODY_MISSING:${post.postId}`);
+    }
+    replyIds.add(post.postId);
+    replies.push({ replyId: post.postId, floor: post.floor, author: post.author, bodyText: post.bodyText });
   }
 }

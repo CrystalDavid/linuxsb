@@ -21,6 +21,8 @@ export interface HomeProbeResult {
 export interface ReplyProbeSummary {
   replyId: number;
   floor: number;
+  author: string;
+  bodyText: string;
 }
 
 export interface TopicProbeResult {
@@ -33,6 +35,24 @@ export interface TopicProbeResult {
   warnings: string[];
 }
 
+export interface TopicStructureProbeResult {
+  detectedBbsVersion: string;
+  tokenCount: number;
+  startTagCount: number;
+  topicLinkCount: number;
+  userLinkCount: number;
+  replyReferenceLinkCount: number;
+  floorAnchorCount: number;
+  postIdPrefixCount: number;
+  replyIdPrefixCount: number;
+  dataFloorCount: number;
+  replyIdParameterCount: number;
+  knownPostEntryMarkerCount: number;
+  candidateReplyContainerCount: number;
+  paginationLinkCount: number;
+  loginVisibleMarkerCount: number;
+}
+
 export type ProbeDecodeKind = 'home' | 'topic';
 
 export interface ProbeDecodeWireResult {
@@ -42,6 +62,7 @@ export interface ProbeDecodeWireResult {
   outputCount: number;
   home?: HomeProbeResult;
   topic?: TopicProbeResult;
+  topicStructure?: TopicStructureProbeResult;
 }
 
 export interface BackgroundProbeDecodeResult extends ProbeDecodeWireResult {

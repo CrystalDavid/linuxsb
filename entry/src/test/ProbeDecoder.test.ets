@@ -26,8 +26,8 @@ const TOPIC_FIXTURE = `<!doctype html>
   <div class="post-content-stats"><span>88</span><span>2</span></div>
   <ul class="post-list topic-post-list">
     <li class="post-item post-entry" id="post-123"><div>main</div></li>
-    <li class="post-item post-entry" id="post-9001"><a class="post-floor">#1</a><x-new>ignored</x-new></li>
-    <li class="post-item post-entry" id="post-9002" data-floor="2"><div>reply</div></li>
+    <li class="post-item post-entry" id="post-9001"><a class="post-author" href="/user/41">user-a</a><a class="post-floor">#1</a><div class="post-content">reply one</div><x-new>ignored</x-new></li>
+    <li class="post-item post-entry" id="post-9002" data-floor="2"><a class="post-author" href="/user/42">user-b</a><div class="post-content">reply two</div></li>
   </ul>
 </body></html>`;
 
@@ -73,6 +73,8 @@ export default function probeDecoderTest() {
       expect(result.replies[0].floor).assertEqual(1);
       expect(result.replies[1].replyId).assertEqual(9002);
       expect(result.replies[1].floor).assertEqual(2);
+      expect(result.replies[0].author).assertEqual('user-a');
+      expect(result.replies[0].bodyText).assertEqual('reply one');
     });
 
     it('distinguishes advertised replies from replies absent in the response', 0, () => {

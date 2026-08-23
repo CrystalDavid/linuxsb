@@ -1,7 +1,12 @@
 import { LoginProbePage } from '../../services/auth/LoginProbePage';
 import { AuthenticatedSessionProbeResult, SessionProbe } from '../../services/auth/SessionProbe';
 import { ProbeDecodeTaskRunner } from '../../services/protocol/ProbeDecodeTask';
-import { HomeTopicProbeSummary, ReplyProbeSummary } from '../../services/protocol/ProbeModels';
+import {
+  BackgroundProbeDecodeResult,
+  HomeTopicProbeSummary,
+  ReplyProbeSummary,
+  TopicStructureProbeResult
+} from '../../services/protocol/ProbeModels';
 import { CookieProbeSummary, cookieSessionBroker } from '../../services/transport/CookieSessionBroker';
 import { TransportProbeResponse } from '../../services/transport/ForumTransport';
 import { RcpForumTransport } from '../../services/transport/RcpForumTransport';
@@ -31,7 +36,24 @@ export struct P0ProbePage {
   @State private topicCounts: string = '';
   @State private topicReplies: ReplyProbeSummary[] = [];
   @State private topicParse: string = '尚未解析';
+  @State private topicStructure: string = '尚未扫描结构';
   @State private topicWarnings: string = '';
+
+  @State private authenticatedTopicOutcome: string = 'NOT RUN';
+  @State private authenticatedTopicTransport: string = '尚未请求';
+  @State private authenticatedTopicCounts: string = '尚未解码';
+  @State private authenticatedTopicReplyContract: string = '尚未验证回复 ID、楼层和最小字段';
+  @State private authenticatedTopicParse: string = '尚未解析';
+  @State private authenticatedTopicStructure: string = '尚未扫描结构';
+  @State private authenticatedTopicWarnings: string = '';
+  @State private topicComparison: string = '匿名与登录后响应尚未完成比较';
+
+  private anonymousTopicSha256: string = '';
+  private anonymousTopicBytes: number = -1;
+  private anonymousTopicMarkers: number = -1;
+  private authenticatedTopicSha256: string = '';
+  private authenticatedTopicBytes: number = -1;
+  private authenticatedTopicMarkers: number = -1;
 
   @State private cookieOutcome: string = 'NOT RUN';
   @State private cookieSummary: string = '尚未检查';
@@ -90,6 +112,10 @@ export struct P0ProbePage {
     this.topicOutcome = 'RUNNING';
     this.topicReplies = [];
     this.topicWarnings = '';
+    this.topicStructure = '尚未扫描结构';
+    this.anonymousTopicSha256 = '';
+    this.anonymousTopicBytes = -1;
+    this.anonymousTopicMarkers = -1;
     try {
       const response = await this.transport.getTopic(topicId);
       this.topicTransport = this.formatTransport(response);
@@ -102,16 +128,103 @@ export struct P0ProbePage {
         this.topicOutcome = 'FAIL · DECODER_RESULT_MISSING';
         return;
       }
+      if (decoded.topicStructure === undefined) {
+        this.topicOutcome = 'FAIL · STRUCTURE_PROBE_RESULT_MISSING';
+        return;
+      }
       this.topicTitle = decoded.topic.title;
       this.topicReplies = decoded.topic.replies;
       this.topicCounts = `主楼 ID ${decoded.topic.mainPostId} · 浏览 ${decoded.topic.viewCount} · 页面声明回复 ${decoded.topic.advertisedReplyCount} · 本响应含回复 ${decoded.topic.replies.length}`;
       this.topicWarnings = decoded.topic.warnings.join(' · ');
       this.topicParse = this.formatParse(decoded.execution, decoded.parseMs, decoded.inputBytes,
         decoded.outputCount, decoded.executionWarning);
-      this.topicOutcome = decoded.topic.protocolMatched && decoded.execution === 'TASKPOOL' ? 'PASS' :
-        (decoded.topic.protocolMatched ? 'FAIL · TASKPOOL_FALLBACK' : 'FAIL · PROTOCOL_MISMATCH');
+      this.topicStructure = this.formatStructure(decoded.topicStructure);
+      this.topicTransport = this.formatTransport(response, decoded.topicStructure.detectedBbsVersion);
+      this.anonymousTopicSha256 = response.metadata.sha256;
+      this.anonymousTopicBytes = response.metadata.byteLength;
+      this.anonymousTopicMarkers = this.structureMarkerCount(decoded.topicStructure);
+      this.refreshTopicComparison();
+      const fingerprintReady = response.metadata.sha256.length === 64;
+      this.topicOutcome = decoded.topic.protocolMatched && decoded.execution === 'TASKPOOL' && fingerprintReady ? 'PASS' :
+        (!decoded.topic.protocolMatched ? 'FAIL · PROTOCOL_MISMATCH' :
+          (decoded.execution !== 'TASKPOOL' ? 'FAIL · TASKPOOL_FALLBACK' : 'FAIL · SHA256_UNAVAILABLE'));
     } catch (error) {
       this.topicOutcome = `FAIL · ${this.safeErrorMessage(error as Error)}`;
+    } finally {
+      this.busyProbe = '';
+    }
+  }
+
+  private async runAuthenticatedTopicProbe(): Promise<void> {
+    if (this.busyProbe.length > 0) {
+      return;
+    }
+    const topicId = this.parseTopicId(this.topicIdText);
+    if (topicId <= 0) {
+      this.authenticatedTopicOutcome = 'FAIL · 请输入正整数主题 ID';
+      return;
+    }
+    const cookieSummary = cookieSessionBroker.inspectArkWebCookies();
+    const cookieHeader = cookieSessionBroker.getRequestCookieHeader();
+    if (!cookieSummary.bbsAuthPresent || !cookieSummary.bbsCsrfPresent || cookieHeader === undefined) {
+      this.authenticatedTopicOutcome = 'NOT RUN';
+      this.authenticatedTopicTransport = '缺少 bbs_auth 或 bbs_csrf，未发送登录后主题请求。';
+      return;
+    }
+    this.busyProbe = 'authenticated-topic';
+    this.authenticatedTopicOutcome = 'RUNNING';
+    this.authenticatedTopicReplyContract = '尚未验证回复 ID、楼层和最小字段';
+    this.authenticatedTopicWarnings = '';
+    this.authenticatedTopicStructure = '尚未扫描结构';
+    this.authenticatedTopicSha256 = '';
+    this.authenticatedTopicBytes = -1;
+    this.authenticatedTopicMarkers = -1;
+    try {
+      const response = await this.transport.getAuthenticatedTopic(topicId, cookieHeader);
+      this.authenticatedTopicTransport = this.formatTransport(response);
+      if (response.error !== undefined) {
+        this.authenticatedTopicOutcome = `FAIL · ${response.error.kind}`;
+        return;
+      }
+      const decoded: BackgroundProbeDecodeResult = await this.decodeRunner.decode('topic', response.body,
+        response.metadata.byteLength, topicId);
+      if (decoded.topic === undefined || decoded.topicStructure === undefined) {
+        this.authenticatedTopicOutcome = 'FAIL · PROBE_RESULT_MISSING';
+        return;
+      }
+      this.authenticatedTopicCounts = `主楼 ID ${decoded.topic.mainPostId} · 页面声明回复 ${decoded.topic.advertisedReplyCount} · 本响应含回复 ${decoded.topic.replies.length}`;
+      this.authenticatedTopicReplyContract = this.formatReplyContract(decoded.topic.replies,
+        decoded.topic.mainPostId);
+      this.authenticatedTopicParse = this.formatParse(decoded.execution, decoded.parseMs, decoded.inputBytes,
+        decoded.outputCount, decoded.executionWarning);
+      this.authenticatedTopicStructure = this.formatStructure(decoded.topicStructure);
+      this.authenticatedTopicWarnings = decoded.topic.warnings.join(' · ');
+      this.authenticatedTopicTransport = this.formatTransport(response, decoded.topicStructure.detectedBbsVersion);
+      this.authenticatedTopicSha256 = response.metadata.sha256;
+      this.authenticatedTopicBytes = response.metadata.byteLength;
+      this.authenticatedTopicMarkers = this.structureMarkerCount(decoded.topicStructure);
+      this.refreshTopicComparison();
+      const repliesMatch = decoded.topic.advertisedReplyCount === decoded.topic.replies.length;
+      const replyContractMatches = this.replyContractMatches(decoded.topic.replies, decoded.topic.mainPostId);
+      const fingerprintReady = response.metadata.sha256.length === 64;
+      if (decoded.topic.protocolMatched && repliesMatch && replyContractMatches &&
+        decoded.topic.warnings.length === 0 && decoded.execution === 'TASKPOOL' && fingerprintReady) {
+        this.authenticatedTopicOutcome = 'PASS · SAME_PAGE_REPLIES';
+      } else if (!decoded.topic.protocolMatched) {
+        this.authenticatedTopicOutcome = 'FAIL · PROTOCOL_MISMATCH';
+      } else if (decoded.execution !== 'TASKPOOL') {
+        this.authenticatedTopicOutcome = 'FAIL · TASKPOOL_FALLBACK';
+      } else if (!fingerprintReady) {
+        this.authenticatedTopicOutcome = 'FAIL · SHA256_UNAVAILABLE';
+      } else if (!replyContractMatches) {
+        this.authenticatedTopicOutcome = 'FAIL · REPLY_ID_FLOOR_OR_FIELD_MISMATCH';
+      } else if (decoded.topicStructure.loginVisibleMarkerCount > 0) {
+        this.authenticatedTopicOutcome = 'FAIL · AUTH_RESPONSE_LOGIN_GATED';
+      } else {
+        this.authenticatedTopicOutcome = 'FAIL · REPLY_CONTRACT_MISMATCH';
+      }
+    } catch (error) {
+      this.authenticatedTopicOutcome = `FAIL · ${this.safeErrorMessage(error as Error)}`;
     } finally {
       this.busyProbe = '';
     }
@@ -153,6 +266,17 @@ export struct P0ProbePage {
     this.cookieSummary = '内存 Cookie Header 已清除；ArkWeb 登录页未常驻。';
     this.sessionOutcome = 'NOT RUN';
     this.sessionSummary = 'RCP session 已关闭；下一次请求将创建新 session。';
+    this.authenticatedTopicOutcome = 'NOT RUN';
+    this.authenticatedTopicTransport = '内存 Cookie Header 已清除；未发送登录后主题请求。';
+    this.authenticatedTopicCounts = '尚未解码';
+    this.authenticatedTopicReplyContract = '尚未验证回复 ID、楼层和最小字段';
+    this.authenticatedTopicParse = '尚未解析';
+    this.authenticatedTopicStructure = '尚未扫描结构';
+    this.authenticatedTopicWarnings = '';
+    this.authenticatedTopicSha256 = '';
+    this.authenticatedTopicBytes = -1;
+    this.authenticatedTopicMarkers = -1;
+    this.topicComparison = '匿名与登录后响应尚未完成比较';
     this.globalNote = '已清理 P0 内存会话。未修改 ArkWeb 的站点 Cookie 存储。';
   }
 
@@ -180,10 +304,69 @@ export struct P0ProbePage {
     return result;
   }
 
-  private formatTransport(response: TransportProbeResponse): string {
+  private formatTransport(response: TransportProbeResponse, bbsVersion: string = ''): string {
     const metadata = response.metadata;
     const error = response.error === undefined ? '' : ` · ${response.error.kind}(${response.error.code})`;
-    return `HTTP ${metadata.statusCode} · ${metadata.byteLength} bytes · ${metadata.contentType.length > 0 ? metadata.contentType : 'Content-Type 缺失'} · ${metadata.elapsedMs} ms${error}`;
+    const encoding = metadata.contentEncoding.length > 0 ? metadata.contentEncoding : 'identity/未声明';
+    const fingerprint = metadata.sha256.length > 0 ? metadata.sha256 : '不可用';
+    const version = bbsVersion.length > 0 ? ` · BBS1 ${bbsVersion}` : '';
+    return `HTTP ${metadata.statusCode} · 最终 URL ${metadata.effectiveUrl} · ${metadata.contentType.length > 0 ? metadata.contentType : 'Content-Type 缺失'} · Content-Encoding ${encoding} · ${metadata.byteLength} bytes · SHA-256 ${fingerprint}${version} · ${metadata.elapsedMs} ms${error}`;
+  }
+
+  private formatStructure(value: TopicStructureProbeResult): string {
+    return `结构：topic/user/reply 链接 ${value.topicLinkCount}/${value.userLinkCount}/${value.replyReferenceLinkCount} · 楼层锚点 ${value.floorAnchorCount} · post-/reply- ID ${value.postIdPrefixCount}/${value.replyIdPrefixCount} · data-floor ${value.dataFloorCount} · replyid ${value.replyIdParameterCount} · post-entry ${value.knownPostEntryMarkerCount} · 候选回复容器 ${value.candidateReplyContainerCount} · 分页链接 ${value.paginationLinkCount} · 登录可见标记 ${value.loginVisibleMarkerCount}`;
+  }
+
+  private replyContractMatches(replies: ReplyProbeSummary[], mainPostId: number): boolean {
+    const replyIds = new Set<number>();
+    for (let index = 0; index < replies.length; index++) {
+      const reply = replies[index];
+      if (reply.replyId <= 0 || reply.replyId === mainPostId || replyIds.has(reply.replyId) ||
+        reply.floor !== index + 1 || reply.author.length === 0 || reply.bodyText.length === 0) {
+        return false;
+      }
+      replyIds.add(reply.replyId);
+    }
+    return replies.length > 0;
+  }
+
+  private formatReplyContract(replies: ReplyProbeSummary[], mainPostId: number): string {
+    const replyIds = new Set<number>();
+    let idsUnique = true;
+    let mainRepeated = false;
+    let fieldsComplete = true;
+    let floors = '';
+    for (let index = 0; index < replies.length; index++) {
+      const reply = replies[index];
+      if (reply.replyId <= 0 || replyIds.has(reply.replyId)) {
+        idsUnique = false;
+      }
+      if (reply.replyId === mainPostId) {
+        mainRepeated = true;
+      }
+      if (reply.author.length === 0 || reply.bodyText.length === 0) {
+        fieldsComplete = false;
+      }
+      replyIds.add(reply.replyId);
+      floors += `${index === 0 ? '' : ','}${reply.floor}`;
+    }
+    return `回复 ID 唯一：${idsUnique ? '是' : '否'} · 主楼重复：${mainRepeated ? '是' : '否'} · 楼层：${floors.length > 0 ? floors : '无'} · 作者/正文最小字段：${fieldsComplete && replies.length > 0 ? '完整' : '不完整'}`;
+  }
+
+  private structureMarkerCount(value: TopicStructureProbeResult): number {
+    return value.topicLinkCount + value.userLinkCount + value.replyReferenceLinkCount + value.floorAnchorCount +
+      value.postIdPrefixCount + value.replyIdPrefixCount + value.dataFloorCount + value.replyIdParameterCount +
+      value.knownPostEntryMarkerCount + value.candidateReplyContainerCount + value.paginationLinkCount +
+      value.loginVisibleMarkerCount;
+  }
+
+  private refreshTopicComparison(): void {
+    if (this.anonymousTopicBytes < 0 || this.authenticatedTopicBytes < 0) {
+      return;
+    }
+    const hashEqual = this.anonymousTopicSha256.length > 0 &&
+      this.anonymousTopicSha256 === this.authenticatedTopicSha256;
+    this.topicComparison = `匿名/登录后：字节 ${this.anonymousTopicBytes}/${this.authenticatedTopicBytes} · SHA-256 ${hashEqual ? '相同' : '不同'} · 结构标记总数 ${this.anonymousTopicMarkers}/${this.authenticatedTopicMarkers}`;
   }
 
   private formatParse(execution: string, elapsedMs: number, inputBytes: number, outputCount: number, warning: string): string {
@@ -254,7 +437,7 @@ export struct P0ProbePage {
           .borderRadius(16)
 
           Column({ space: 10 }) {
-            Text('P0-3  匿名主题与主题协议')
+            Text('P0-B  Topic 605 回复来源与解码契约')
               .fontSize(18)
               .fontWeight(FontWeight.Bold)
               .width('100%')
@@ -264,6 +447,7 @@ export struct P0ProbePage {
             Text(this.topicOutcome).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
             Text(this.topicTransport).fontSize(12).fontColor('#475467').width('100%')
             Text(this.topicParse).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.topicStructure).fontSize(12).fontColor('#475467').width('100%')
             if (this.topicTitle.length > 0) {
               Text(this.topicTitle).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
               Text(this.topicCounts).fontSize(12).fontColor('#475467').width('100%')
@@ -276,9 +460,29 @@ export struct P0ProbePage {
             if (this.topicWarnings.length > 0) {
               Text(this.topicWarnings).fontSize(11).fontColor('#B54708').width('100%')
             }
-            Button(this.busyProbe === 'topic' ? '请求中…' : '运行公开主题 RCP')
-              .enabled(this.busyProbe.length === 0)
-              .onClick(() => this.runTopicProbe())
+            Text(`登录后主题：${this.authenticatedTopicOutcome}`)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+            Text(this.authenticatedTopicTransport).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicCounts).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicReplyContract).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicParse).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicStructure).fontSize(12).fontColor('#475467').width('100%')
+            if (this.authenticatedTopicWarnings.length > 0) {
+              Text(this.authenticatedTopicWarnings).fontSize(11).fontColor('#B54708').width('100%')
+            }
+            Text(this.topicComparison).fontSize(12).fontColor('#344054').width('100%')
+            Flex({ wrap: FlexWrap.Wrap }) {
+              Button(this.busyProbe === 'topic' ? '请求中…' : '运行匿名 Topic 结构探针')
+                .enabled(this.busyProbe.length === 0)
+                .margin({ right: 8, bottom: 8 })
+                .onClick(() => this.runTopicProbe())
+              Button(this.busyProbe === 'authenticated-topic' ? '请求中…' : '运行登录后 Topic 结构探针')
+                .enabled(this.busyProbe.length === 0)
+                .margin({ right: 8, bottom: 8 })
+                .onClick(() => this.runAuthenticatedTopicProbe())
+            }
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
