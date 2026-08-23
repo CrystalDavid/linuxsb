@@ -2,7 +2,7 @@
 
 > 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
 
-> 阶段状态（2026-08-23）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 授权 UI 移植、只读性能实现、Pura 90（API 24）模拟器回归以及 API 26 真机 signed HAP、登录和回复视觉复验已经完成。严格验收仍为 FAIL：模拟器冷正文目标仅 3/5 达标，认证高回复 Topic 15365 出现 `REPLY_STRUCTURE_MISMATCH`；DevEco ArkUI Inspector 为 NOT RUN。已验证的 RCP、协议解码、TaskPool、临时 ArkWeb 登录与 Cookie 内存桥接架构继续冻结；真实写操作继续为 NOT RUN。
+> 阶段状态（2026-08-24）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 严格状态仍为 FAIL：模拟器冷正文目标仅 3/5 达标，认证高回复 Topic 15365 出现 `REPLY_STRUCTURE_MISMATCH`，DevEco ArkUI Inspector 为 NOT RUN。当前仅执行 M2-R1.1，对真实分页契约、原生正文边界、授权 ArkDO 抽屉/详情表现和主题打开性能进行修复；未完成全部验收前不得将 M2-R1 改为 PASS 或进入 M2-B。已验证架构继续冻结，真实写操作继续为 NOT RUN。
 
 ## 1. 产品定义
 
@@ -151,6 +151,15 @@ M1 阶段门已经通过；后续仍不得在没有新任务明确授权时扩�
 | P0-8 写操作 | NOT RUN | FAB 与回复栏保持禁用；没有 POST 实现或请求 |
 
 M2-R1 的授权 UI、主题打开优化和 API 26 真机核心闭环已经形成可复验候选版本，但完整里程碑严格记为 FAIL，不以局部 PASS 掩盖冷网络超标和高回复主题结构不兼容。后续如获新任务，应先对 Topic 15365 做独立、只读的版本化协议契约调查，再决定是否支持分页；不得猜测路由或执行 POST。DevEco ArkUI Inspector 仍需在桌面交互环境稳定时单独复验。P0、P0-B 与 M1 的历史结论不受本节影响。
+
+### 2.7 M2-R1.1 修复范围与阶段门
+
+- 当前分支：`m2/r1-1-native-topic-drawer-perf`，基线提交 `891231c`；不得创建 M2-R1 PASS 标签。
+- 唯一目标：以 BBS1 v8.6.5 真实分页 href 修复 Topic 15365，分离正文与网页控制/扩展元数据，按 ArkDO 固定提交重做抽屉和主题详情，并继续缩短可感知打开时间。
+- 普通 Home/Topic 必须保持纯 ArkUI；ArkWeb 只允许临时官方登录。新增 `NoWebOutsideLogin` 源码与 UI 结构自动检查。
+- 分页仅允许 RCP GET；首屏只取第一页，接近底部再取下一页；按 replyId 去重并维持楼层顺序、重试幂等和返回后已加载页状态。
+- P0-8 仍为 NOT RUN，禁止 POST、发帖、回复、编辑或删除。
+- 当前状态：分支与安全 checkpoint 为 PASS；实现、自动测试、ArkUI Inspector、Pura 90 和最终 API 26 验收均为 NOT RUN；M2-R1 总状态保持 FAIL。
 
 ## 3. 协议适配原则
 

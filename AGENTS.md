@@ -1,18 +1,19 @@
-# Codex Instructions — 烧饼社区 M2-R1 授权 UI 移植与主题打开性能
+# Codex Instructions — 烧饼社区 M2-R1.1 分页回复、原生详情、抽屉与性能修复
 
 ## 当前唯一任务
 
-在不改变已验证业务架构的前提下，直接移植并改造 ArkDO 核心 UI，同时修复主题打开延迟：
+在不改变已验证业务架构的前提下，修复 M2-R1 遗留的分页、原生主题详情、ArkDO 抽屉高保真和主题打开性能问题：
 
 ```text
-ArkDO 固定提交的授权 UI
-→ 烧饼社区 Presentation Adapter
-→ 紧凑首页 / 筛选抽屉 / 主题详情
-→ 立即导航 + 骨架屏
-→ 共享 RCP Session + 内存缓存 + 在途去重 + 受控预取
+登录后主题 GET
+→ BBS1 v8.6.5 真实分页 href
+→ TopicReplyPage + TaskPool
+→ 原生 TopicDetailPage + 懒加载回复
+→ ArkDO 固定提交的授权抽屉/详情 UI
+→ 立即导航 + 骨架屏 + 缓存/去重/受控预取
 ```
 
-所有结果严格使用 PASS、FAIL 或 NOT RUN。M2-R1 完成后停止，不自行进入真实发帖、回复、编辑或删除。
+所有结果严格使用 PASS、FAIL 或 NOT RUN。M2-R1 在本轮全部验收通过前继续保持 FAIL；M2-R1.1 完成后停止，不自行进入 M2-B、搜索、个人中心、通知或任何写操作。
 
 ## 开始工作前
 
@@ -33,7 +34,7 @@ ArkDO 固定提交的授权 UI
 
 ## Git 与敏感信息边界
 
-- 当前开发分支：`m2/arkdo-authorized-ui-port`。
+- 当前开发分支：`m2/r1-1-native-topic-drawer-perf`，从 M2-R1 失败基线提交 `891231c` 创建。
 - 分支基线：annotated tag `m1-pass-api26-20260823` 指向的 M1 稳定提交。
 - `main` 上已通过的 P0/P0-B/M1 历史和标签不得重写。
 - `build-profile.json5` 的本机签名版保持 `skip-worktree`，不得读取、暂存或提交。
@@ -112,7 +113,7 @@ ArkDO 固定提交的授权 UI
 - 不修改 `P0_REPORT.md`；
 - 不新建大量 M2-R1 文档。
 
-## 当前状态（2026-08-23）
+## 当前状态（2026-08-24）
 
 - M1 稳定基线与新分支：PASS。
 - ArkDO 固定提交及指定 UI 文件可读取：PASS。
@@ -128,5 +129,6 @@ ArkDO 固定提交的授权 UI
 - 高回复主题兼容性：FAIL（Topic 15365）；认证 GET 成功返回后解码结果为 `REPLY_STRUCTURE_MISMATCH`。本轮不猜分页路由、不执行 POST，也不把协议修订混入 UI 里程碑。
 - 真机最终进程日志：PASS；783 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、HTTP POST 0。
 - DevEco ArkUI Inspector 交互检查：NOT RUN（本轮桌面窗口焦点不稳定）；已用 TestKit 与 `dumpLayout` 完成组件层级、空白、抽屉边界和普通页面 Web 节点检查。
-- M2-R1 完整里程碑关闭：FAIL；授权 UI 和核心性能实现已完成，但冷正文目标与高回复主题兼容性未全部通过，且 ArkUI Inspector 为 NOT RUN。到此停止，不自行扩展协议或写操作。
+- M2-R1 历史状态：FAIL；冷正文目标、高回复主题兼容性未全部通过，ArkUI Inspector 为 NOT RUN。
+- M2-R1.1 分支与安全 checkpoint：PASS；实现、测试、Inspector 和最终 API 26 复验均为 NOT RUN。
 - P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。
