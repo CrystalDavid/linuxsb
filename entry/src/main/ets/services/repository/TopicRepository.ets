@@ -1,6 +1,8 @@
 import { ContentBlock, ContentBlockKind, paragraphBlock, unsupportedBlock } from '../../models/ContentBlock';
 import { Author, Reply, ReplyAccess, TopicDetail, TopicPost } from '../../models/TopicModels';
 import { AuthSessionPort } from '../auth/AuthSession';
+import { TopicMemoryCache } from '../cache/TopicMemoryCache';
+import { TopicPrefetchPort } from '../cache/TopicPrefetchCoordinator';
 import { TopicOpenTrace } from '../logging/TopicOpenTrace';
 import {
   ProductDecodePort,
@@ -9,7 +11,7 @@ import {
   TopicProtocolDocument,
   TopicProtocolReply
 } from '../protocol/ProductProtocolModels';
-import { ForumTransport, TransportErrorKind } from '../transport/ForumTransport';
+import { ForumTransport, TransportCachePolicy, TransportErrorKind } from '../transport/ForumTransport';
 import {
   RepositoryDiagnostics,
   RepositoryFailureKind,
@@ -17,30 +19,92 @@ import {
   TopicLoadResult
 } from './RepositoryModels';
 
-export class TopicRepository implements TopicDataSourcePort {
+export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
   private transport: ForumTransport;
   private decoder: ProductDecodePort;
   private authSession: AuthSessionPort;
+  private cache: TopicMemoryCache;
+  private inFlight: Map<string, Promise<TopicLoadResult>> = new Map<string, Promise<TopicLoadResult>>();
 
-  constructor(transport: ForumTransport, decoder: ProductDecodePort, authSession: AuthSessionPort) {
+  constructor(transport: ForumTransport, decoder: ProductDecodePort, authSession: AuthSessionPort,
+    cache: TopicMemoryCache = new TopicMemoryCache()) {
     this.transport = transport;
     this.decoder = decoder;
     this.authSession = authSession;
+    this.cache = cache;
   }
 
   captureOfficialLogin(): boolean {
-    return this.authSession.captureOfficialLogin();
+    const wasAuthenticated = this.authSession.getRequestCookieHeader() !== undefined;
+    const captured = this.authSession.captureOfficialLogin();
+    const isAuthenticated = this.authSession.getRequestCookieHeader() !== undefined;
+    if (captured && !wasAuthenticated && isAuthenticated) {
+      this.cache.clearAnonymous();
+    }
+    return captured;
   }
 
-  async loadTopic(topicId: number): Promise<TopicLoadResult> {
+  peekTopic(topicId: number): TopicDetail | undefined {
     const cookieHeader = this.authSession.getRequestCookieHeader();
-    TopicOpenTrace.markCacheLookupStart(cookieHeader !== undefined);
-    TopicOpenTrace.markCacheLookupEnd(false);
-    TopicOpenTrace.markRequestQueued();
-    TopicOpenTrace.markRequestStart();
-    const response = cookieHeader === undefined ? await this.transport.getTopic(topicId) :
-      await this.transport.getAuthenticatedTopic(topicId, cookieHeader);
-    TopicOpenTrace.markBodyComplete();
+    TopicOpenTrace.markCacheLookupStart(topicId, cookieHeader !== undefined);
+    const lookup = this.cache.get(topicId, cookieHeader !== undefined);
+    TopicOpenTrace.markCacheLookupEnd(topicId, lookup.hit);
+    return lookup.data;
+  }
+
+  async prefetchTopic(topicId: number): Promise<void> {
+    await this.loadTopic(topicId, false);
+  }
+
+  clearTopicCache(): void {
+    this.cache.clear();
+  }
+
+  async loadTopic(topicId: number, forceRefresh: boolean = false): Promise<TopicLoadResult> {
+    const cookieHeader = this.authSession.getRequestCookieHeader();
+    const authenticated = cookieHeader !== undefined;
+    if (!forceRefresh) {
+      const lookup = this.cache.get(topicId, authenticated);
+      if (lookup.hit && lookup.data !== undefined) {
+        return {
+          ok: true,
+          data: lookup.data,
+          diagnostics: {
+            statusCode: 200,
+            networkMs: 0,
+            parseMs: 0,
+            inputBytes: 0,
+            execution: 'MEMORY_CACHE',
+            cacheHit: true,
+            cacheAgeMs: lookup.ageMs
+          }
+        };
+      }
+    }
+    const key = `${authenticated ? 'auth' : 'anon'}:${topicId}`;
+    const pending = this.inFlight.get(key);
+    if (pending !== undefined) {
+      const joined = await pending;
+      joined.diagnostics.joinedInFlight = true;
+      return joined;
+    }
+    const request = this.fetchAndDecode(topicId, cookieHeader, authenticated);
+    this.inFlight.set(key, request);
+    try {
+      return await request;
+    } finally {
+      this.inFlight.delete(key);
+    }
+  }
+
+  private async fetchAndDecode(topicId: number, cookieHeader: string | undefined,
+    authenticated: boolean): Promise<TopicLoadResult> {
+    TopicOpenTrace.markRequestQueued(topicId);
+    TopicOpenTrace.markRequestStart(topicId);
+    const response = cookieHeader === undefined ?
+      await this.transport.getTopic(topicId, TransportCachePolicy.Product) :
+      await this.transport.getAuthenticatedTopic(topicId, cookieHeader, TransportCachePolicy.Product);
+    TopicOpenTrace.markBodyComplete(topicId);
     const networkDiagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -59,9 +123,9 @@ export class TopicRepository implements TopicDataSourcePort {
       };
     }
 
-    TopicOpenTrace.markTaskPoolSubmit();
+    TopicOpenTrace.markTaskPoolSubmit(topicId);
     const decoded = await this.decoder.decodeTopic(response.body, response.metadata.byteLength, topicId);
-    TopicOpenTrace.markDecodeComplete();
+    TopicOpenTrace.markDecodeComplete(topicId);
     const diagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -85,7 +149,6 @@ export class TopicRepository implements TopicDataSourcePort {
     }
 
     const mapped = this.mapDocument(topicId, decoded.document);
-    TopicOpenTrace.markMappingComplete();
     if (mapped === undefined) {
       return {
         ok: false,
@@ -93,6 +156,7 @@ export class TopicRepository implements TopicDataSourcePort {
         diagnostics: diagnostics
       };
     }
+    this.cache.put(topicId, authenticated, mapped);
     return { ok: true, data: mapped, diagnostics: diagnostics };
   }
 

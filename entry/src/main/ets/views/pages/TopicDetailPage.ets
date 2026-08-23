@@ -1,182 +1,252 @@
-import { AppLayout, AppRadius, AppSpacing, AppTypography } from '../../common/theme/AppTheme';
-import { Reply, ReplyAccess, TopicDetail } from '../../models/TopicModels';
-import { TopicDetailViewModel } from '../../viewmodels/TopicDetailViewModel';
+import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
+import { AppColors, PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { immersiveTitleBarContentTopSpacer } from '../../common/ui/ImmersiveTitleBarLayout';
+import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
+import {
+  ImmersiveLightArea,
+  requiresHdsComponentSafeArea,
+  requiresHdsLayoutSafeAreaAvoidance
+} from '../../common/ui/ImmersiveLightMaterial';
+import { SYS_BOTTOM_INSET_KEY, SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
+import { ReplyUiModel, TopicDetailUiModel, TopicUiModel } from '../../models/presentation/ForumUiModels';
+import { ReplyAccess } from '../../models/TopicModels';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
+import { TopicDetailViewModel } from '../../viewmodels/TopicDetailViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
-import { ContentBlockRenderer } from '../components/ContentBlockRenderer';
+import { CommentInputBar } from '../components/CommentInputBar';
+import { LoadStateView } from '../components/LoadStateView';
 import { LoginRequiredCard } from '../components/LoginRequiredCard';
+import { TopicDetailHeader } from '../components/TopicDetailHeader';
+import { TopicPostItem } from '../components/TopicPostItem';
 
 @Component
 export struct TopicDetailPage {
   @ObjectLink viewModel: TopicDetailViewModel;
   topicId: number = 0;
+  summary: TopicUiModel | undefined = undefined;
+  onBack: () => void = () => {};
   onLogin: () => void = () => {};
+  @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
+  @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
+  private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     TopicOpenTrace.markDestinationAppear();
-    if (this.topicId > 0 && (this.viewModel.topicId !== this.topicId || this.viewModel.detail === undefined)) {
-      this.viewModel.load(this.topicId);
+    if (this.topicId > 0) {
+      this.viewModel.open(this.topicId, this.summary);
     }
   }
 
+  private displayTitle(): string {
+    if (this.viewModel.presentationDetail !== undefined) {
+      return this.viewModel.presentationDetail.title;
+    }
+    return this.summary?.title ?? '主题详情';
+  }
+
+  private displayCategory(): string {
+    return this.summary?.category.name ?? '';
+  }
+
+  private showWriteUnavailable(): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '写操作尚未开放', duration: 1800 });
+    } catch (_) {}
+  }
+
   @Builder
-  private stateMessage(title: string, detail: string) {
-    Column({ space: AppSpacing.SM }) {
-      Text(title)
-        .fontSize(AppTypography.TITLE)
+  private titleBarContent() {
+    TopicDetailHeader({ title: this.displayTitle(), categoryName: this.displayCategory() })
+  }
+
+  @Builder
+  private topicIntro(detail: TopicDetailUiModel) {
+    Column({ space: Spacing.SM }) {
+      Text(detail.title)
+        .fontSize(Typography.HEADLINE)
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-      Text(detail)
-        .fontSize(AppTypography.BODY)
-        .fontColor($r('app.color.text_secondary'))
-        .textAlign(TextAlign.Center)
-      Button('重试')
-        .onClick(() => this.viewModel.retry())
+        .fontColor(SemanticColors.textPrimary())
+        .lineHeight(31)
+        .width('100%')
+      Row({ space: Spacing.MD }) {
+        if (this.displayCategory().length > 0) {
+          Text(this.displayCategory())
+            .fontSize(Typography.CAPTION)
+            .fontColor(AppColors.brandPrimary())
+            .padding({ left: Spacing.SM, right: Spacing.SM, top: 3, bottom: 3 })
+            .backgroundColor(AppColors.brandSoft())
+            .borderRadius(Radius.XS)
+        }
+        Text(`${detail.viewCount} 次浏览`)
+          .fontSize(Typography.CAPTION)
+          .fontColor(SemanticColors.textSecondary())
+      }
+      .width('100%')
     }
     .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .padding(AppSpacing.XL)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.MD })
+    .backgroundColor(SemanticColors.surface())
   }
 
   @Builder
-  private mainPost(detail: TopicDetail) {
-    Column({ space: AppSpacing.MD }) {
-      Column({ space: AppSpacing.XS }) {
-        Text(detail.title)
-          .fontSize(AppTypography.DISPLAY)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-        Row({ space: AppSpacing.SM }) {
-          Text(detail.mainPost.author.displayName)
-            .fontSize(AppTypography.BODY)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-          Text(`主题 #${detail.topicId}`)
-            .fontSize(AppTypography.CAPTION)
-            .fontColor($r('app.color.text_tertiary'))
-          Text(`${detail.viewCount} 次浏览`)
-            .fontSize(AppTypography.CAPTION)
-            .fontColor($r('app.color.text_tertiary'))
+  private detailContent(detail: TopicDetailUiModel) {
+    List({ scroller: this.scroller }) {
+      ListItem() {
+        Row() {
+          Blank()
         }
         .width('100%')
+        .height(immersiveTitleBarContentTopSpacer(this.topInset))
       }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-
-      ContentBlockRenderer({ blocks: detail.mainPost.content })
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding(AppSpacing.LG)
-    .backgroundColor($r('app.color.surface'))
-    .borderRadius(AppRadius.LG)
-    .border({ width: 1, color: $r('app.color.border') })
-  }
-
-  @Builder
-  private replyCard(reply: Reply) {
-    Column({ space: AppSpacing.MD }) {
-      Row({ space: AppSpacing.SM }) {
-        Text(reply.author.displayName)
-          .fontSize(AppTypography.BODY)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
-        Text(`#${reply.floor}`)
-          .fontSize(AppTypography.CAPTION)
-          .fontColor($r('app.color.primary'))
+      ListItem() { this.topicIntro(detail) }
+      ListItem() {
+        TopicPostItem({ post: detail.mainPost, mainPost: true })
       }
-      .width('100%')
-
-      ContentBlockRenderer({ blocks: reply.content })
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding(AppSpacing.LG)
-    .backgroundColor($r('app.color.surface'))
-    .borderRadius(AppRadius.LG)
-    .border({ width: 1, color: $r('app.color.border') })
-  }
-
-  @Builder
-  private content(detail: TopicDetail) {
-    Scroll() {
-      Column({ space: AppSpacing.MD }) {
-        this.mainPost(detail)
-
-        if (detail.replyAccess === ReplyAccess.LoginRequired) {
+      if (detail.replyAccess === ReplyAccess.LoginRequired) {
+        ListItem() {
           LoginRequiredCard({
             replyCount: detail.advertisedReplyCount,
             onLogin: () => this.onLogin()
           })
-        } else if (detail.replies.length > 0) {
+            .margin({ left: Spacing.MD, right: Spacing.MD, top: Spacing.MD, bottom: Spacing.MD })
+        }
+      } else if (detail.replies.length > 0) {
+        ListItem() {
           Row() {
             Text(`${detail.replies.length} 条回复`)
-              .fontSize(AppTypography.TITLE)
+              .fontSize(Typography.TITLE_SMALL)
               .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(SemanticColors.textPrimary())
           }
           .width('100%')
-          .padding({ top: AppSpacing.XS })
-
-          ForEach(detail.replies, (reply: Reply) => {
-            this.replyCard(reply)
-          }, (reply: Reply) => reply.replyId.toString())
+          .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.SM })
+          .backgroundColor(SemanticColors.page())
         }
-
-        if (this.viewModel.loginError.length > 0) {
-          Text(this.viewModel.loginError)
-            .fontSize(AppTypography.CAPTION)
-            .fontColor($r('app.color.error'))
-            .width('100%')
-            .padding(AppSpacing.SM)
-            .backgroundColor($r('app.color.error_soft'))
-            .borderRadius(AppRadius.SM)
-        }
+        ForEach(detail.replies, (reply: ReplyUiModel) => {
+          ListItem() {
+            Column() {
+              TopicPostItem({ post: reply, mainPost: false })
+              Divider().color(SemanticColors.divider()).margin({ left: Spacing.MD, right: Spacing.MD })
+            }
+          }
+        }, (reply: ReplyUiModel) => reply.postId.toString())
       }
-      .width('100%')
-      .constraintSize({ minHeight: '100%' })
-      .justifyContent(FlexAlign.Start)
-      .padding({ left: AppSpacing.MD, right: AppSpacing.MD, top: AppSpacing.MD, bottom: AppSpacing.XXL })
+      ListItem() {
+        Row() {
+          Blank()
+        }
+        .width('100%')
+        .height(PageMetrics.REPLY_BAR_HEIGHT + this.bottomInset + Spacing.LG)
+      }
     }
-    .width('100%')
-    .height('100%')
+    .id('topic-post-list')
+    .width('100%').height('100%')
+    .scrollBar(BarState.Off)
+    .onAppear(() => TopicOpenTrace.markFirstContentFrame())
+  }
+
+  @Builder
+  private skeleton() {
+    List({ scroller: this.scroller }) {
+      ListItem() {
+        Row() {
+          Blank()
+        }
+        .width('100%')
+        .height(immersiveTitleBarContentTopSpacer(this.topInset))
+      }
+      ListItem() {
+        Column({ space: Spacing.MD }) {
+          Text(this.displayTitle())
+            .fontSize(Typography.HEADLINE)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(SemanticColors.textPrimary())
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+          Row({ space: Spacing.SM }) {
+            Row().width(36).height(36).borderRadius(Radius.PILL).backgroundColor(SemanticColors.skeleton())
+            Column({ space: Spacing.SM }) {
+              Row().width('38%').height(13).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+              Row().width('22%').height(10).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%')
+          Row().width('100%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+          Row().width('92%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+          Row().width('76%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+          Row().width('84%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.XL })
+        .backgroundColor(SemanticColors.surface())
+      }
+    }
+    .id('topic-skeleton')
+    .width('100%').height('100%')
+    .scrollBar(BarState.Off)
+    .onAppear(() => TopicOpenTrace.markSkeletonFrame())
+  }
+
+  @Builder
+  private mainContent() {
+    if ((this.viewModel.state === ViewLoadState.Loading || this.viewModel.state === ViewLoadState.Idle) &&
+      this.viewModel.presentationDetail === undefined) {
+      this.skeleton()
+    } else if (this.viewModel.state === ViewLoadState.Offline) {
+      LoadStateView({
+        state: ViewLoadState.Offline,
+        title: '当前无法联网',
+        detail: '请检查网络连接后重试。',
+        semanticPrefix: 'topic',
+        onRetry: () => this.viewModel.retry()
+      }).padding({ top: immersiveTitleBarContentTopSpacer(this.topInset) })
+    } else if (this.viewModel.state === ViewLoadState.Error || this.viewModel.presentationDetail === undefined) {
+      LoadStateView({
+        state: ViewLoadState.Error,
+        title: '主题加载失败',
+        detail: '服务响应暂时无法转换为稳定主题结构。',
+        semanticPrefix: 'topic',
+        onRetry: () => this.viewModel.retry()
+      }).padding({ top: immersiveTitleBarContentTopSpacer(this.topInset) })
+    } else {
+      this.detailContent(this.viewModel.presentationDetail)
+    }
   }
 
   build() {
-    Column() {
-      if (this.viewModel.state === ViewLoadState.Loading || this.viewModel.state === ViewLoadState.Idle) {
-        Column({ space: AppSpacing.SM }) {
-          LoadingProgress()
-            .width(40)
-            .height(40)
-            .color($r('app.color.primary'))
-          Text('正在加载主题…')
-            .fontSize(AppTypography.BODY)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-        .onAppear(() => TopicOpenTrace.markSkeletonFrame())
-      } else if (this.viewModel.state === ViewLoadState.Offline) {
-        this.stateMessage('当前无法联网', '请检查网络连接后重试。')
-      } else if (this.viewModel.state === ViewLoadState.Error || this.viewModel.detail === undefined) {
-        this.stateMessage('主题加载失败', '服务响应无法转换为稳定的主题结构。')
-      } else {
-        Column() {
-          this.content(this.viewModel.detail)
-        }
-        .width('100%')
-        .height('100%')
-        .onAppear(() => TopicOpenTrace.markFirstContentFrame())
+    Stack({ alignContent: Alignment.Bottom }) {
+      this.mainContent()
+
+      HdsNavigation() {
+        Column().width('100%').height('100%')
       }
+      .titleBar({
+        avoidLayoutSafeArea: requiresHdsLayoutSafeAreaAvoidance(ImmersiveLightArea.TITLE_BAR),
+        enableComponentSafeArea: requiresHdsComponentSafeArea(ImmersiveLightArea.TITLE_BAR),
+        style: buildImmersiveTitleBarStyle(),
+        content: {
+          backIcon: {
+            icon: $r('sys.symbol.chevron_left'),
+            label: '返回',
+            action: () => this.onBack()
+          },
+          stackBuilder: () => { this.titleBarContent(); }
+        }
+      })
+      .bindToScrollable([this.scroller])
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .mode(NavigationMode.Stack)
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .width('100%').height('100%')
+      .backgroundColor(Color.Transparent)
+      .hitTestBehavior(HitTestMode.Transparent)
+
+      CommentInputBar({ onUnavailable: () => this.showWriteUnavailable() })
     }
-    .width('100%')
-    .height('100%')
-    .constraintSize({ maxWidth: AppLayout.DETAIL_CONTENT_MAX })
-    .backgroundColor($r('app.color.page_background'))
+    .id('topic-detail-page')
+    .width('100%').height('100%')
+    .backgroundColor(SemanticColors.page())
   }
 }

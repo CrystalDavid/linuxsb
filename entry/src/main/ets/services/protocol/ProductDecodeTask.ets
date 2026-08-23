@@ -34,7 +34,18 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
         topicId: item.topicId,
         title: item.title,
         forumId: item.forumId,
-        forumName: item.forumName
+        forumName: item.forumName,
+        authorId: item.authorId,
+        authorName: item.authorName,
+        authorAvatarUrl: item.authorAvatarUrl,
+        replyCount: item.replyCount,
+        lastReplyUser: item.lastReplyUser,
+        lastReplyAt: item.lastReplyAt,
+        isPinned: item.isPinned,
+        isFeatured: item.isFeatured,
+        isHot: item.isHot,
+        lotteryStatus: item.lotteryStatus,
+        cardStatus: item.cardStatus
       });
     }
     const wire: ProductDecodeWireResult = {

@@ -59,6 +59,66 @@
     {
       "name": "quote_background",
       "value": "#FF17313A"
+    },
+    {
+      "name": "brand_primary",
+      "value": "#FF69C5DF"
+    },
+    {
+      "name": "brand_accent",
+      "value": "#FFF0A66F"
+    },
+    {
+      "name": "brand_soft",
+      "value": "#FF163743"
+    },
+    {
+      "name": "surface_elevated",
+      "value": "#FF20272E"
+    },
+    {
+      "name": "divider",
+      "value": "#FF2A333B"
+    },
+    {
+      "name": "warning_soft",
+      "value": "#FF44311A"
+    },
+    {
+      "name": "success",
+      "value": "#FF61D89B"
+    },
+    {
+      "name": "disabled",
+      "value": "#FF6F7A84"
+    },
+    {
+      "name": "disabled_surface",
+      "value": "#FF252D34"
+    },
+    {
+      "name": "skeleton",
+      "value": "#FF2A333B"
+    },
+    {
+      "name": "avatar_background",
+      "value": "#FF20414B"
+    },
+    {
+      "name": "hds_title_bar_scrolled_bg",
+      "value": "#E6101418"
+    },
+    {
+      "name": "post_content_surface_bg",
+      "value": "#FF222A31"
+    },
+    {
+      "name": "post_content_border",
+      "value": "#FF37424C"
+    },
+    {
+      "name": "immersive_input_field_bg",
+      "value": "#FF252D34"
     }
   ]
 }

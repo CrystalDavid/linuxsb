@@ -1,14 +1,14 @@
-import { TopicSummary } from '../../models/HomeModels';
+import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 
 export class TopicListDataSource implements IDataSource {
-  private items: TopicSummary[] = [];
+  private items: TopicUiModel[] = [];
   private listeners: DataChangeListener[] = [];
 
   totalCount(): number {
     return this.items.length;
   }
 
-  getData(index: number): TopicSummary {
+  getData(index: number): TopicUiModel {
     return this.items[index];
   }
 
@@ -25,7 +25,7 @@ export class TopicListDataSource implements IDataSource {
     }
   }
 
-  replace(items: TopicSummary[]): void {
+  replace(items: TopicUiModel[]): void {
     this.items = items.slice();
     for (let index = 0; index < this.listeners.length; index++) {
       this.listeners[index].onDataReloaded();

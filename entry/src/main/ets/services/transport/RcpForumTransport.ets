@@ -2,6 +2,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import {
   ForumTransport,
+  TransportCachePolicy,
   TransportErrorKind,
   TransportProbeError,
   TransportProbeMetadata,
@@ -10,26 +11,29 @@ import {
 import { ResponseFingerprint } from './ResponseFingerprint';
 
 const FORUM_ORIGIN = 'https://linux.sb';
-const USER_AGENT = 'ShaobingCommunity-P0/0.1 (HarmonyOS; technical-probe)';
+const PROBE_USER_AGENT = 'ShaobingCommunity-P0/0.1 (HarmonyOS; technical-probe)';
+const PRODUCT_USER_AGENT = 'ShaobingCommunity/1.0 (HarmonyOS; read-only)';
 
 export class RcpForumTransport implements ForumTransport {
   private session: rcp.Session | undefined = undefined;
   private activeRequests: rcp.Request[] = [];
 
-  async getHome(): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/`);
+  async getHome(cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/`, '', cachePolicy);
   }
 
-  async getTopic(topicId: number): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`);
+  async getTopic(topicId: number,
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, '', cachePolicy);
   }
 
-  async getAuthenticatedTopic(topicId: number, cookieHeader: string): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, cookieHeader);
+  async getAuthenticatedTopic(topicId: number, cookieHeader: string,
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, cookieHeader, cachePolicy);
   }
 
   async getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/notify`, cookieHeader);
+    return this.get(`${FORUM_ORIGIN}/notify`, cookieHeader, TransportCachePolicy.ProbeNoStore);
   }
 
   cancelAll(): void {
@@ -64,7 +68,8 @@ export class RcpForumTransport implements ForumTransport {
     this.activeRequests = [];
   }
 
-  private async get(url: string, cookieHeader: string = ''): Promise<TransportProbeResponse> {
+  private async get(url: string, cookieHeader: string,
+    cachePolicy: TransportCachePolicy): Promise<TransportProbeResponse> {
     const startedAt = Date.now();
     const session = this.ensureSession();
     if (session === undefined) {
@@ -85,15 +90,19 @@ export class RcpForumTransport implements ForumTransport {
     const headers: rcp.RequestHeaders = {
       'accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
       'accept-language': 'zh-CN,zh;q=0.9,en;q=0.5',
-      'cache-control': 'no-cache',
-      'user-agent': USER_AGENT
+      'user-agent': cachePolicy === TransportCachePolicy.ProbeNoStore ? PROBE_USER_AGENT : PRODUCT_USER_AGENT
     };
+    if (cachePolicy === TransportCachePolicy.ProbeNoStore) {
+      headers['cache-control'] = 'no-cache';
+    }
     if (cookieHeader.length > 0) {
       headers['cookie'] = cookieHeader;
     }
     const request = new rcp.Request(url, 'GET', headers);
     request.destination = 'array-buffer';
-    request.cacheControl = { noCache: true, noStore: true };
+    if (cachePolicy === TransportCachePolicy.ProbeNoStore) {
+      request.cacheControl = { noCache: true, noStore: true };
+    }
     this.activeRequests.push(request);
 
     try {

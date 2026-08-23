@@ -1,4 +1,6 @@
 import { TopicSummary } from '../models/HomeModels';
+import { TopicUiModel } from '../models/presentation/ForumUiModels';
+import { TopicPresentationMapper } from '../services/presentation/TopicPresentationMapper';
 import { HomeDataSourcePort, RepositoryDiagnostics, RepositoryFailureKind, emptyDiagnostics } from '../services/repository/RepositoryModels';
 import { ViewLoadState } from './ViewState';
 
@@ -6,14 +8,17 @@ import { ViewLoadState } from './ViewState';
 export class HomeViewModel {
   state: ViewLoadState = ViewLoadState.Idle;
   topics: TopicSummary[] = [];
+  presentationTopics: TopicUiModel[] = [];
   protocolVersion: string = '';
   errorMessage: string = '';
   refreshing: boolean = false;
   diagnostics: RepositoryDiagnostics = emptyDiagnostics();
   private dataSource: HomeDataSourcePort;
+  private mapper: TopicPresentationMapper;
 
-  constructor(dataSource: HomeDataSourcePort) {
+  constructor(dataSource: HomeDataSourcePort, mapper: TopicPresentationMapper = new TopicPresentationMapper()) {
     this.dataSource = dataSource;
+    this.mapper = mapper;
   }
 
   async load(isRefresh: boolean = false): Promise<void> {
@@ -36,6 +41,7 @@ export class HomeViewModel {
       return;
     }
     this.topics = result.data.topics;
+    this.presentationTopics = this.mapper.mapSummaries(this.topics);
     this.protocolVersion = result.data.protocolVersion;
     this.state = this.topics.length === 0 ? ViewLoadState.Empty : ViewLoadState.Content;
   }

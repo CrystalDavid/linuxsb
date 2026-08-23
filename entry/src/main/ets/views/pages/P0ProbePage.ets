@@ -10,6 +10,7 @@ import {
 import { CookieProbeSummary, cookieSessionBroker } from '../../services/transport/CookieSessionBroker';
 import { TransportProbeResponse } from '../../services/transport/ForumTransport';
 import { RcpForumTransport } from '../../services/transport/RcpForumTransport';
+import { TransportCachePolicy } from '../../services/transport/ForumTransport';
 import { DisabledWriteContractProbe } from '../../services/transport/WriteContractProbe';
 
 @Component
@@ -74,7 +75,7 @@ export struct P0ProbePage {
     this.homeTopics = [];
     this.homeWarnings = '';
     try {
-      const response = await this.transport.getHome();
+        const response = await this.transport.getHome(TransportCachePolicy.ProbeNoStore);
       this.homeTransport = this.formatTransport(response);
       if (response.error !== undefined) {
         this.homeOutcome = `FAIL · ${response.error.kind}`;
@@ -117,7 +118,7 @@ export struct P0ProbePage {
     this.anonymousTopicBytes = -1;
     this.anonymousTopicMarkers = -1;
     try {
-      const response = await this.transport.getTopic(topicId);
+        const response = await this.transport.getTopic(topicId, TransportCachePolicy.ProbeNoStore);
       this.topicTransport = this.formatTransport(response);
       if (response.error !== undefined) {
         this.topicOutcome = `FAIL · ${response.error.kind}`;
@@ -180,7 +181,11 @@ export struct P0ProbePage {
     this.authenticatedTopicBytes = -1;
     this.authenticatedTopicMarkers = -1;
     try {
-      const response = await this.transport.getAuthenticatedTopic(topicId, cookieHeader);
+        const response = await this.transport.getAuthenticatedTopic(
+          topicId,
+          cookieHeader,
+          TransportCachePolicy.ProbeNoStore
+        );
       this.authenticatedTopicTransport = this.formatTransport(response);
       if (response.error !== undefined) {
         this.authenticatedTopicOutcome = `FAIL · ${response.error.kind}`;

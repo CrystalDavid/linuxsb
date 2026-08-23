@@ -1,6 +1,6 @@
 import { HomeFeed, TopicSummary } from '../../models/HomeModels';
 import { ProductDecodePort } from '../protocol/ProductProtocolModels';
-import { ForumTransport, TransportErrorKind } from '../transport/ForumTransport';
+import { ForumTransport, TransportCachePolicy, TransportErrorKind } from '../transport/ForumTransport';
 import {
   HomeDataSourcePort,
   HomeLoadResult,
@@ -18,7 +18,7 @@ export class HomeRepository implements HomeDataSourcePort {
   }
 
   async loadHome(): Promise<HomeLoadResult> {
-    const response = await this.transport.getHome();
+    const response = await this.transport.getHome(TransportCachePolicy.Product);
     const networkDiagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -67,7 +67,18 @@ export class HomeRepository implements HomeDataSourcePort {
         topicId: item.topicId,
         title: item.title,
         forumId: item.forumId,
-        forumName: item.forumName
+        forumName: item.forumName,
+        authorId: item.authorId,
+        authorName: item.authorName,
+        authorAvatarUrl: item.authorAvatarUrl,
+        replyCount: item.replyCount,
+        lastReplyUser: item.lastReplyUser,
+        lastReplyAt: item.lastReplyAt,
+        isPinned: item.isPinned,
+        isFeatured: item.isFeatured,
+        isHot: item.isHot,
+        lotteryStatus: item.lotteryStatus,
+        cardStatus: item.cardStatus
       });
     }
     const feed: HomeFeed = {

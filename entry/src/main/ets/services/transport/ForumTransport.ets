@@ -33,10 +33,16 @@ export interface TransportProbeResponse {
   error?: TransportProbeError;
 }
 
+export enum TransportCachePolicy {
+  Product = 'Product',
+  ProbeNoStore = 'ProbeNoStore'
+}
+
 export interface ForumTransport {
-  getHome(): Promise<TransportProbeResponse>;
-  getTopic(topicId: number): Promise<TransportProbeResponse>;
-  getAuthenticatedTopic(topicId: number, cookieHeader: string): Promise<TransportProbeResponse>;
+  getHome(cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
+  getTopic(topicId: number, cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
+  getAuthenticatedTopic(topicId: number, cookieHeader: string,
+    cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
   getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse>;
   cancelAll(): void;
   close(): void;

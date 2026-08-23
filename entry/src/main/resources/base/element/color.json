@@ -59,6 +59,66 @@
     {
       "name": "quote_background",
       "value": "#FFEAF4F7"
+    },
+    {
+      "name": "brand_primary",
+      "value": "#FF176B87"
+    },
+    {
+      "name": "brand_accent",
+      "value": "#FFB95F21"
+    },
+    {
+      "name": "brand_soft",
+      "value": "#FFE0F1F6"
+    },
+    {
+      "name": "surface_elevated",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "divider",
+      "value": "#FFE5E9ED"
+    },
+    {
+      "name": "warning_soft",
+      "value": "#FFFFF1DB"
+    },
+    {
+      "name": "success",
+      "value": "#FF168B52"
+    },
+    {
+      "name": "disabled",
+      "value": "#FF89949E"
+    },
+    {
+      "name": "disabled_surface",
+      "value": "#FFE8ECEF"
+    },
+    {
+      "name": "skeleton",
+      "value": "#FFE5E9ED"
+    },
+    {
+      "name": "avatar_background",
+      "value": "#FFDCEEF3"
+    },
+    {
+      "name": "hds_title_bar_scrolled_bg",
+      "value": "#E6F5F7FA"
+    },
+    {
+      "name": "post_content_surface_bg",
+      "value": "#FFF0F3F7"
+    },
+    {
+      "name": "post_content_border",
+      "value": "#FFD3DCE3"
+    },
+    {
+      "name": "immersive_input_field_bg",
+      "value": "#FFF0F3F7"
     }
   ]
 }

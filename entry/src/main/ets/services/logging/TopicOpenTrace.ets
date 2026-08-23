@@ -65,49 +65,65 @@ export class TopicOpenTrace {
     TopicOpenTrace.markOnce('skeletonFrameAt');
   }
 
-  static markCacheLookupStart(authenticated: boolean): void {
+  static markCacheLookupStart(topicId: number, authenticated: boolean): void {
     const snapshot = TopicOpenTrace.active;
-    if (snapshot === undefined) {
+    if (snapshot === undefined || topicId <= 0 || snapshot.topicId !== topicId) {
       return;
     }
     snapshot.authenticated = authenticated;
     TopicOpenTrace.mark('cacheLookupStart');
   }
 
-  static markCacheLookupEnd(cacheHit: boolean): void {
+  static markCacheLookupEnd(topicId: number, cacheHit: boolean): void {
     const snapshot = TopicOpenTrace.active;
-    if (snapshot === undefined) {
+    if (snapshot === undefined || topicId <= 0 || snapshot.topicId !== topicId) {
       return;
     }
     snapshot.cacheHit = cacheHit;
     TopicOpenTrace.mark('cacheLookupEnd');
   }
 
-  static markRequestQueued(): void {
+  static markRequestQueued(topicId: number): void {
+    if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
+      return;
+    }
     TopicOpenTrace.mark('requestQueuedAt');
   }
 
-  static markRequestStart(): void {
+  static markRequestStart(topicId: number): void {
     const snapshot = TopicOpenTrace.active;
-    if (snapshot !== undefined) {
-      snapshot.networkRequestCount++;
+    if (snapshot === undefined || topicId <= 0 || snapshot.topicId !== topicId) {
+      return;
     }
+    snapshot.networkRequestCount++;
     TopicOpenTrace.mark('requestStartAt');
   }
 
-  static markBodyComplete(): void {
+  static markBodyComplete(topicId: number): void {
+    if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
+      return;
+    }
     TopicOpenTrace.mark('bodyCompleteAt');
   }
 
-  static markTaskPoolSubmit(): void {
+  static markTaskPoolSubmit(topicId: number): void {
+    if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
+      return;
+    }
     TopicOpenTrace.mark('taskPoolSubmitAt');
   }
 
-  static markDecodeComplete(): void {
+  static markDecodeComplete(topicId: number): void {
+    if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
+      return;
+    }
     TopicOpenTrace.mark('decodeCompleteAt');
   }
 
-  static markMappingComplete(): void {
+  static markMappingComplete(topicId: number): void {
+    if (!TopicOpenTrace.matches(TopicOpenTrace.active, topicId)) {
+      return;
+    }
     TopicOpenTrace.mark('mappingCompleteAt');
   }
 
@@ -195,5 +211,9 @@ export class TopicOpenTrace {
       stage,
       at - snapshot.tapAt
     );
+  }
+
+  private static matches(snapshot: TopicOpenTraceSnapshot | undefined, topicId: number): boolean {
+    return snapshot !== undefined && topicId > 0 && snapshot.topicId === topicId;
   }
 }

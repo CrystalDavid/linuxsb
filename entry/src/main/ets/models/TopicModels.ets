@@ -2,6 +2,8 @@ import { ContentBlock } from './ContentBlock';
 
 export interface Author {
   displayName: string;
+  userId?: number;
+  avatarUrl?: string;
 }
 
 export interface TopicPost {

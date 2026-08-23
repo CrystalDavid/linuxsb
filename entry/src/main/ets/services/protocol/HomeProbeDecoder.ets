@@ -7,6 +7,17 @@ class HomeTopicDraft {
   title: string = '';
   forumId: number = 0;
   forumName: string = '';
+  authorId: number = 0;
+  authorName: string = '';
+  authorAvatarUrl: string = '';
+  replyCount: number = -1;
+  lastReplyUser: string = '';
+  lastReplyAt: number = 0;
+  isPinned: boolean = false;
+  isFeatured: boolean = false;
+  isHot: boolean = false;
+  lotteryStatus: string = '';
+  cardStatus: string = '';
 }
 
 export class HomeProbeDecoder {
@@ -21,6 +32,11 @@ export class HomeProbeDecoder {
     let anchorKind = '';
     let anchorText = '';
     let anchorId = 0;
+    let postMetaDepth = 0;
+    let postMetaSpanDepth = 0;
+    let postMetaSpanIndex = 0;
+    let postMetaText = '';
+    let postAvatarDepth = 0;
 
     new LightweightHtmlTokenizer().scan(html, (token: HtmlToken) => {
       if (token.type === HtmlTokenType.START_TAG) {
@@ -30,6 +46,40 @@ export class HomeProbeDecoder {
         if (token.name === 'li' && hasClass(token.attributes, 'post-item')) {
           this.finalizeTopic(currentItem, topics, topicIds, warnings);
           currentItem = new HomeTopicDraft();
+          currentItem.isPinned = hasClass(token.attributes, 'topic-pinned');
+          postMetaDepth = 0;
+          postMetaSpanDepth = 0;
+          postMetaSpanIndex = 0;
+          postMetaText = '';
+          postAvatarDepth = 0;
+        }
+        if (currentItem !== undefined) {
+          this.captureStatus(token, currentItem);
+          if (token.name === 'div' && hasClass(token.attributes, 'post-avatar')) {
+            postAvatarDepth = 1;
+          } else if (token.name === 'div' && postAvatarDepth > 0) {
+            postAvatarDepth++;
+          }
+          if (token.name === 'div' && hasClass(token.attributes, 'post-meta')) {
+            postMetaDepth = 1;
+            postMetaSpanIndex = 0;
+          } else if (token.name === 'div' && postMetaDepth > 0) {
+            postMetaDepth++;
+          }
+          if (postMetaDepth > 0 && token.name === 'span') {
+            if (postMetaSpanDepth === 0) {
+              postMetaSpanIndex++;
+              postMetaText = '';
+              const performanceTime = token.attributes.get('data-performance-time') ?? '';
+              if (performanceTime.length > 0) {
+                currentItem.lastReplyAt = this.parsePositiveNumber(performanceTime);
+              }
+            }
+            postMetaSpanDepth++;
+          }
+          if (postAvatarDepth > 0 && token.name === 'img' && currentItem.authorAvatarUrl.length === 0) {
+            currentItem.authorAvatarUrl = this.normalizeAssetUrl(token.attributes.get('src') ?? '');
+          }
         }
         if (token.name !== 'a') {
           return;
@@ -41,11 +91,15 @@ export class HomeProbeDecoder {
         const href = token.attributes.get('href') ?? '';
         const topicId = parseRouteId(href, '/topic/');
         const forumId = parseRouteId(href, '/forum/');
+        const authorId = parseRouteId(href, '/user/');
         if (currentItem !== undefined && topicId > 0 && hasClass(token.attributes, 'post-title')) {
           anchorKind = 'topic';
           anchorId = topicId;
+        } else if (currentItem !== undefined && authorId > 0) {
+          anchorKind = 'author';
+          anchorId = authorId;
         } else if (forumId > 0) {
-          anchorKind = currentItem !== undefined && hasClass(token.attributes, 'post-forum-badge') ? 'item-forum' : 'forum';
+          anchorKind = currentItem !== undefined ? 'item-forum' : 'forum';
           anchorId = forumId;
         } else if (href.startsWith('https://bbs1.org') || href.startsWith('https://www.bbs1.org')) {
           anchorKind = 'version';
@@ -53,8 +107,13 @@ export class HomeProbeDecoder {
         return;
       }
 
-      if (token.type === HtmlTokenType.TEXT && anchorKind.length > 0) {
-        anchorText += token.text;
+      if (token.type === HtmlTokenType.TEXT) {
+        if (anchorKind.length > 0) {
+          anchorText += token.text;
+        }
+        if (currentItem !== undefined && postMetaDepth > 0 && postMetaSpanDepth > 0) {
+          postMetaText += token.text;
+        }
         return;
       }
 
@@ -63,6 +122,11 @@ export class HomeProbeDecoder {
         if (anchorKind === 'topic' && currentItem !== undefined) {
           currentItem.topicId = anchorId;
           currentItem.title = text;
+        } else if (anchorKind === 'author' && currentItem !== undefined) {
+          currentItem.authorId = anchorId;
+          if (text.length > 0) {
+            currentItem.authorName = text;
+          }
         } else if (anchorKind === 'item-forum' && currentItem !== undefined) {
           currentItem.forumId = anchorId;
           currentItem.forumName = text;
@@ -76,6 +140,30 @@ export class HomeProbeDecoder {
         anchorText = '';
         anchorId = 0;
         return;
+      }
+
+      if (token.type === HtmlTokenType.END_TAG && currentItem !== undefined) {
+        if (token.name === 'span' && postMetaSpanDepth > 0) {
+          postMetaSpanDepth--;
+          if (postMetaSpanDepth === 0) {
+            const text = collapseWhitespace(postMetaText);
+            if (postMetaSpanIndex === 3) {
+              currentItem.replyCount = this.parseCount(text);
+            } else if (postMetaSpanIndex === 4) {
+              currentItem.lastReplyUser = text;
+            }
+            postMetaText = '';
+          }
+        }
+        if (token.name === 'div' && postMetaDepth > 0) {
+          postMetaDepth--;
+          if (postMetaDepth === 0) {
+            postMetaSpanDepth = 0;
+          }
+        }
+        if (token.name === 'div' && postAvatarDepth > 0) {
+          postAvatarDepth--;
+        }
       }
 
       if (token.type === HtmlTokenType.END_TAG && token.name === 'li') {
@@ -121,8 +209,86 @@ export class HomeProbeDecoder {
         topicId: draft.topicId,
         title: draft.title,
         forumId: draft.forumId,
-        forumName: draft.forumName
+        forumName: draft.forumName,
+        authorId: draft.authorId,
+        authorName: draft.authorName,
+        authorAvatarUrl: draft.authorAvatarUrl,
+        replyCount: draft.replyCount >= 0 ? draft.replyCount : undefined,
+        lastReplyUser: draft.lastReplyUser,
+        lastReplyAt: draft.lastReplyAt,
+        isPinned: draft.isPinned,
+        isFeatured: draft.isFeatured,
+        isHot: draft.isHot,
+        lotteryStatus: draft.lotteryStatus,
+        cardStatus: draft.cardStatus
       });
     }
+  }
+
+  private captureStatus(token: HtmlToken, draft: HomeTopicDraft): void {
+    if (hasClass(token.attributes, 'topic-badge') && hasClass(token.attributes, 'pinned')) {
+      draft.isPinned = true;
+    }
+    if (hasClass(token.attributes, 'topic-stamp-hot')) {
+      draft.isHot = true;
+    }
+    if (hasClass(token.attributes, 'topic-stamp-featured') || hasClass(token.attributes, 'topic-stamp-excellent')) {
+      draft.isFeatured = true;
+    }
+    if (hasClass(token.attributes, 'community-lottery-title-status')) {
+      draft.lotteryStatus = this.statusClass(token.attributes.get('class') ?? '', 'community-lottery-title-status');
+    }
+    if (hasClass(token.attributes, 'virtual-card-title-status')) {
+      draft.cardStatus = this.statusClass(token.attributes.get('class') ?? '', 'virtual-card-title-status');
+    }
+  }
+
+  private statusClass(classValue: string, baseClass: string): string {
+    const parts = classValue.split(' ');
+    for (let index = 0; index < parts.length; index++) {
+      const value = parts[index].trim();
+      if (value.length > 0 && value !== baseClass) {
+        return value;
+      }
+    }
+    return '';
+  }
+
+  private normalizeAssetUrl(value: string): string {
+    if (value.startsWith('https://linux.sb/')) {
+      return value;
+    }
+    if (value.startsWith('/')) {
+      return `https://linux.sb${value}`;
+    }
+    return '';
+  }
+
+  private parseCount(value: string): number {
+    let normalized = '';
+    for (let index = 0; index < value.length; index++) {
+      const current = value.charAt(index);
+      if (current >= '0' && current <= '9') {
+        normalized += current;
+      } else if (current !== ',' && current !== ' ') {
+        return -1;
+      }
+    }
+    return normalized.length > 0 ? this.parsePositiveNumber(normalized) : -1;
+  }
+
+  private parsePositiveNumber(value: string): number {
+    let result = 0;
+    for (let index = 0; index < value.length; index++) {
+      const current = value.charAt(index);
+      if (current < '0' || current > '9') {
+        return 0;
+      }
+      result = result * 10 + current.charCodeAt(0) - 48;
+      if (result > 2147483647) {
+        return 0;
+      }
+    }
+    return result;
   }
 }

@@ -20,6 +20,9 @@ export interface RepositoryDiagnostics {
   parseMs: number;
   inputBytes: number;
   execution: string;
+  cacheHit?: boolean;
+  cacheAgeMs?: number;
+  joinedInFlight?: boolean;
 }
 
 export interface HomeLoadResult {
@@ -41,7 +44,10 @@ export interface HomeDataSourcePort {
 }
 
 export interface TopicDataSourcePort {
-  loadTopic(topicId: number): Promise<TopicLoadResult>;
+  loadTopic(topicId: number, forceRefresh?: boolean): Promise<TopicLoadResult>;
+  peekTopic?(topicId: number): TopicDetail | undefined;
+  prefetchTopic?(topicId: number): Promise<void>;
+  clearTopicCache?(): void;
   captureOfficialLogin(): boolean;
 }
 
