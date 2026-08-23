@@ -1,0 +1,264 @@
+# 烧饼社区项目基线 v0.1
+
+> 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
+
+## 1. 产品定义
+
+### 1.1 身份
+
+- 产品名：**烧饼社区**
+- 定位：LinuxSB 的非官方第三方 HarmonyOS 客户端
+- 平台基线：HarmonyOS 6.1，API 23
+- 技术栈：ArkTS、Stage 模型、ArkUI、UI Design Kit、Remote Communication Kit、ArkWeb（仅登录）
+- 服务端前提：不修改 linux.sb，不依赖站长安装插件，不建设中转代理服务器
+
+应用内必须明确显示“非官方客户端”，不得让用户误以为由 linux.sb 站方发布。
+
+### 1.2 产品目标
+
+为 HarmonyOS 手机和平板提供比浏览器更顺手的社区阅读与互动体验：原生列表、原生主题详情、原生导航、深浅色与大屏适配，同时继续使用 linux.sb 官方账号体系和权限规则。
+
+### 1.3 第一版范围
+
+首版目标功能：
+
+- 游客浏览首页、版块、主题和回复；
+- 新评论、新帖子、精华等基础筛选；
+- 搜索；
+- 官方网页登录与会话保持；
+- 登录后的个人资料、我的主题、我的回复和通知；
+- 新建主题、回复、编辑、删除（以服务端权限为准）；
+- 本地草稿；
+- 图片查看、分享、深浅色、手机单栏和平板双栏。
+
+暂不进入首版主线：系统推送、实时在线状态、实时回复、私信、离线全文库、后台管理，以及所有 LinuxSB 插件的完整原生化。插件功能按独立扩展解码器逐项接入，不能污染普通主题链路。
+
+## 2. 唯一主架构
+
+### 2.1 结论
+
+```text
+ArkUI 页面
+  ↓
+ViewModel / Service
+  ↓
+Repository
+  ↓
+ForumTransport（正式实现只有 RcpForumTransport）
+  ↓
+RCP 原生 HTTP
+  ↓
+BBS1 版本化单遍协议解码
+  ↓
+Topic / Reply / User 等领域模型
+  ↓
+ArkUI 原生绘制
+```
+
+登录链路：
+
+```text
+ArkUI 点击登录
+  ↓
+临时 LoginWebPage（ArkWeb，加载 linux.sb 官方登录页）
+  ↓
+网站写入 bbs_auth / bbs_csrf Cookie
+  ↓
+CookieSessionBroker 仅在内存中读取所需 Cookie
+  ↓
+关闭登录页
+  ↓
+后续业务继续统一走 RCP
+```
+
+**这不是两套并行方案。** ArkWeb 不承担首页、主题详情或普通业务请求；它只是官方登录入口。正常业务阶段不得保留常驻隐藏 ArkWeb。
+
+### 2.2 为什么选择它
+
+- 相比全 ArkWeb 请求桥：冷启动、内存、请求调度和长期复杂度更低；
+- 相比网页套壳：可见内容由 ArkUI 绘制，导航、列表、缓存和大屏体验可控；
+- 相比 CSS/DOM 提取：解码器不建立 DOM、CSSOM，不执行网页脚本，也不进行网页布局和绘制；
+- 相比自建代理：用户 Cookie 不离开设备，没有额外服务器、隐私责任和中转延迟。
+
+### 2.3 必须通过 P0 才能冻结为生产架构的部分
+
+理论设计无法替代真实设备验证。P0 必须验证：
+
+1. RCP 能匿名访问 linux.sb；
+2. 单遍解码可以稳定提取首页和主题核心字段；
+3. ArkWeb 可以完成官方登录；
+4. 应用可以检测并安全读取必要 Cookie 的存在；
+5. 将 Cookie 交给 RCP 后，服务器认可登录态；
+6. RCP 写操作的 CSRF 与 AJAX 契约可行；
+7. 解析耗时和内存满足原生体验。
+
+如果第 3～6 项失败，不在产品代码中引入“业务走隐藏 ArkWeb”的第二套长期架构；暂停写操作主线并寻求站长启用最小 JSON API 插件。
+
+## 3. 协议适配原则
+
+### 3.1 不是通用爬虫
+
+烧饼社区针对明确的 BBS1 版本和 linux.sb 扩展结构开发协议适配器：
+
+```text
+ProtocolAdapter
+├── Bbs1V865Adapter
+│   ├── HomeDecoder
+│   ├── TopicDecoder
+│   ├── UserDecoder
+│   ├── NotificationDecoder
+│   └── FormContract
+└── LinuxSbExtensions
+    ├── FeaturedDecoder
+    ├── LikeCoinDecoder
+    ├── LotteryDecoder
+    └── CardDecoder
+```
+
+核心解码器只识别语义边界、路由 ID、属性和表单字段，不关心颜色、字体、margin、CSS 计算结果或完整 DOM 树。
+
+### 3.2 解码要求
+
+- 单遍或有限回溯，时间复杂度目标为 O(n)；
+- 解码任务放在 TaskPool/Worker，不阻塞 UI 线程；
+- 未识别扩展生成 `UnsupportedExtension`，不得导致整个页面失败；
+- 页面结构签名不匹配时，返回明确的 `PROTOCOL_MISMATCH`，不得静默输出错误数据；
+- 协议层不得依赖 ArkUI；UI 层不得出现 HTML 选择器、Cookie 或表单字段。
+
+### 3.3 缓存
+
+- 首页优先显示上一次成功缓存，再后台刷新；
+- 主题缓存按 ID 保存有限最近记录；
+- Cookie 不写普通 Preferences，不写日志；
+- 用户可以清缓存，但清缓存不得删除草稿或登录会话。
+
+## 4. UI 基线
+
+### 4.1 设计方向
+
+首版视觉与交互以 ArkDO 的成熟体验为对标对象，但采用 **clean-room 独立实现**：
+
+- 不复制 ArkDO 源码、注释、资源、图标和品牌资产；
+- 使用 ArkUI、HarmonyOS Symbol、UI Design Kit 与 HDS 组件重新实现；
+- 页面结构、交互层级、内容密度、抽屉、回复浮层、图片预览、深色模式和双栏逻辑可对标；
+- 使用“烧饼社区”自己的名称、图标、配色语义和文案。
+
+### 4.2 首版页面
+
+```text
+Root
+├── 首页
+│   ├── 主题列表
+│   ├── 筛选/版块抽屉
+│   └── 新建主题
+├── 搜索
+├── 主题详情
+│   ├── 主楼
+│   ├── 回复列表
+│   ├── 图片预览
+│   └── 回复/编辑浮层
+├── 登录
+├── 我的
+│   ├── 个人资料
+│   ├── 我的主题/回复
+│   ├── 通知
+│   └── 草稿
+└── 设置
+```
+
+P0 阶段不实现完整页面，只实现技术探针页。
+
+## 5. 工程目录
+
+```text
+entry/src/main/ets/
+├── app/                         启动、全局环境、会话协调
+├── common/
+│   ├── constants/
+│   ├── theme/
+│   ├── ui/
+│   └── utils/
+├── models/                      Forum、Topic、Reply、User、ContentBlock
+├── navigation/                  Navigation + NavPathStack 路由
+├── services/
+│   ├── transport/
+│   │   ├── ForumTransport.ets
+│   │   ├── RcpForumTransport.ets
+│   │   ├── CookieSessionBroker.ets
+│   │   └── ResponseCache.ets
+│   ├── auth/
+│   │   ├── AuthSession.ets
+│   │   ├── LoginWebPage.ets
+│   │   └── SessionProbe.ets
+│   ├── protocol/
+│   │   ├── ProtocolAdapter.ets
+│   │   ├── ProtocolVersionDetector.ets
+│   │   ├── HtmlTokenizer.ets
+│   │   ├── HtmlEntityDecoder.ets
+│   │   ├── bbs1/v8_6_5/
+│   │   └── extensions/
+│   ├── repository/
+│   ├── draft/
+│   └── logging/
+└── views/
+    ├── pages/
+    └── components/
+
+contracts/bbs1/v8.6.5/           路由、表单和结构契约
+contracts/fixtures/              合成或脱敏测试页面，不提交真实 Cookie
+entry/src/test/                  纯逻辑与协议单元测试
+entry/src/ohosTest/              设备集成测试
+```
+
+第一阶段保持单 HAP、单 entry 模块；未出现真实模块边界前不得提前拆分多个 Feature Module。
+
+## 6. 工程标准
+
+### 6.1 依赖边界
+
+- Page/Component 不直接发网络请求、不解析 HTML、不读 Cookie；
+- Repository 不依赖 ArkUI；
+- DTO/协议对象不得直接进入 UI；
+- 所有站点请求只经过 `ForumTransport`；
+- 当前正式业务实现只允许 `RcpForumTransport`；
+- ArkWeb 只允许出现在 `services/auth` 与登录页面。
+
+### 6.2 安全
+
+- 不记录账号、密码、Cookie 值、CSRF 值、完整私密正文；
+- 登录页只加载受信任的 `https://linux.sb/` 域名，外链转系统浏览器；
+- Cookie 仅在必要时驻留内存；
+- P0 默认禁止真实 POST；
+- 不修改、提交或生成真实签名证书、Profile、私钥与密码；
+- 不绕过验证码、人机验证、站点权限或限流。
+
+### 6.3 质量目标
+
+P0 先记录真实数据，正式阶段目标如下：
+
+- 缓存首页首屏尽快可见，随后无感刷新；
+- 正常浏览时 ArkWeb 实例为 0；
+- 首页和主题解析不阻塞 UI；
+- 同时网络请求不超过 4 个；
+- 列表使用懒加载和精准更新；
+- 每个页面具备 Loading、Empty、Error、Offline、Unauthorized 状态；
+- 手机、平板、深浅色和系统大字体均纳入完成标准。
+
+## 7. P0 决策规则
+
+### 通过
+
+匿名请求、登录、Cookie 衔接、登录后 RCP 请求和协议解码全部通过后，正式冻结本架构并进入首页纵向闭环。
+
+### 条件通过
+
+读取与登录通过、真实写操作尚未验证：可以继续只读页面与编辑器开发，但写操作保持功能开关关闭。
+
+### 不通过
+
+- RCP 被站点/WAF 阻断；
+- 无法从官方登录页安全获得可用于 RCP 的会话；
+- 登录后 RCP 始终不被服务器认可；
+- 写操作协议无法在不绕过安全机制的前提下成立。
+
+出现以上任一情况，Codex 必须停止扩展产品功能，生成证据报告。下一步是联系站长安装最小 API 插件，而不是偷偷切换为网页套壳或长期隐藏 ArkWeb 业务桥。
