@@ -1,6 +1,7 @@
 import { AppLayout, AppRadius, AppSpacing, AppTypography } from '../../common/theme/AppTheme';
 import { Reply, ReplyAccess, TopicDetail } from '../../models/TopicModels';
 import { TopicDetailViewModel } from '../../viewmodels/TopicDetailViewModel';
+import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { ContentBlockRenderer } from '../components/ContentBlockRenderer';
 import { LoginRequiredCard } from '../components/LoginRequiredCard';
@@ -12,6 +13,7 @@ export struct TopicDetailPage {
   onLogin: () => void = () => {};
 
   aboutToAppear(): void {
+    TopicOpenTrace.markDestinationAppear();
     if (this.topicId > 0 && (this.viewModel.topicId !== this.topicId || this.viewModel.detail === undefined)) {
       this.viewModel.load(this.topicId);
     }
@@ -158,12 +160,18 @@ export struct TopicDetailPage {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
+        .onAppear(() => TopicOpenTrace.markSkeletonFrame())
       } else if (this.viewModel.state === ViewLoadState.Offline) {
         this.stateMessage('当前无法联网', '请检查网络连接后重试。')
       } else if (this.viewModel.state === ViewLoadState.Error || this.viewModel.detail === undefined) {
         this.stateMessage('主题加载失败', '服务响应无法转换为稳定的主题结构。')
       } else {
-        this.content(this.viewModel.detail)
+        Column() {
+          this.content(this.viewModel.detail)
+        }
+        .width('100%')
+        .height('100%')
+        .onAppear(() => TopicOpenTrace.markFirstContentFrame())
       }
     }
     .width('100%')

@@ -1,6 +1,7 @@
 import { ContentBlock, ContentBlockKind, paragraphBlock, unsupportedBlock } from '../../models/ContentBlock';
 import { Author, Reply, ReplyAccess, TopicDetail, TopicPost } from '../../models/TopicModels';
 import { AuthSessionPort } from '../auth/AuthSession';
+import { TopicOpenTrace } from '../logging/TopicOpenTrace';
 import {
   ProductDecodePort,
   ProtocolContentBlock,
@@ -33,8 +34,13 @@ export class TopicRepository implements TopicDataSourcePort {
 
   async loadTopic(topicId: number): Promise<TopicLoadResult> {
     const cookieHeader = this.authSession.getRequestCookieHeader();
+    TopicOpenTrace.markCacheLookupStart(cookieHeader !== undefined);
+    TopicOpenTrace.markCacheLookupEnd(false);
+    TopicOpenTrace.markRequestQueued();
+    TopicOpenTrace.markRequestStart();
     const response = cookieHeader === undefined ? await this.transport.getTopic(topicId) :
       await this.transport.getAuthenticatedTopic(topicId, cookieHeader);
+    TopicOpenTrace.markBodyComplete();
     const networkDiagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -53,7 +59,9 @@ export class TopicRepository implements TopicDataSourcePort {
       };
     }
 
+    TopicOpenTrace.markTaskPoolSubmit();
     const decoded = await this.decoder.decodeTopic(response.body, response.metadata.byteLength, topicId);
+    TopicOpenTrace.markDecodeComplete();
     const diagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -77,6 +85,7 @@ export class TopicRepository implements TopicDataSourcePort {
     }
 
     const mapped = this.mapDocument(topicId, decoded.document);
+    TopicOpenTrace.markMappingComplete();
     if (mapped === undefined) {
       return {
         ok: false,

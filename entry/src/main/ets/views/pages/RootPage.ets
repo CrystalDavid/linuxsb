@@ -1,6 +1,7 @@
 import { bundleManager } from '@kit.AbilityKit';
 import { m1Runtime } from '../../app/M1Runtime';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
+import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { HomePage } from './HomePage';
 import { P0ProbePage } from './P0ProbePage';
 import { TopicDetailPage } from './TopicDetailPage';
@@ -25,13 +26,19 @@ export struct RootPage {
   @State private showOfficialLogin: boolean = false;
   private debugPackage: boolean = isDebugPackage();
 
+  aboutToAppear(): void {
+    TopicOpenTrace.configure(this.debugPackage);
+  }
+
   aboutToDisappear(): void {
     m1Runtime.close();
   }
 
   private openTopic(topicId: number): void {
+    TopicOpenTrace.begin(topicId);
     this.selectedTopicId = topicId;
     this.pathStack.pushPathByName(TOPIC_ROUTE, null);
+    TopicOpenTrace.markRoutePush();
   }
 
   private openDiagnostics(): void {
