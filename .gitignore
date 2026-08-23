@@ -10,3 +10,13 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+
+# Local device evidence and anonymous protocol snapshots
+/artifacts/
+
+# Signing material must never enter source control
+*.p12
+*.cer
+*.p7b
+*.pem
+*.key
