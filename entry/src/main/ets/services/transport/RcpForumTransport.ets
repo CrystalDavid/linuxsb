@@ -7,6 +7,7 @@ import {
   TransportProbeMetadata,
   TransportProbeResponse
 } from './ForumTransport';
+import { ResponseFingerprint } from './ResponseFingerprint';
 
 const FORUM_ORIGIN = 'https://linux.sb';
 const USER_AGENT = 'ShaobingCommunity-P0/0.1 (HarmonyOS; technical-probe)';
@@ -21,6 +22,10 @@ export class RcpForumTransport implements ForumTransport {
 
   async getTopic(topicId: number): Promise<TransportProbeResponse> {
     return this.get(`${FORUM_ORIGIN}/topic/${topicId}`);
+  }
+
+  async getAuthenticatedTopic(topicId: number, cookieHeader: string): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, cookieHeader);
   }
 
   async getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse> {
@@ -68,8 +73,10 @@ export class RcpForumTransport implements ForumTransport {
           statusCode: 0,
           byteLength: 0,
           contentType: '',
+          contentEncoding: '',
           elapsedMs: Date.now() - startedAt,
-          effectiveUrl: url
+          effectiveUrl: url,
+          sha256: ''
         },
         body: '',
         error: { kind: 'UNKNOWN', code: 0, message: 'Unable to create the RCP session.' }
@@ -86,18 +93,22 @@ export class RcpForumTransport implements ForumTransport {
     }
     const request = new rcp.Request(url, 'GET', headers);
     request.destination = 'array-buffer';
+    request.cacheControl = { noCache: true, noStore: true };
     this.activeRequests.push(request);
 
     try {
       const response = await session.fetch(request);
       const contentType = this.headerValue(response.headers['content-type']);
+      const contentEncoding = this.headerValue(response.headers['content-encoding']);
       const body = response.toString();
       const metadata: TransportProbeMetadata = {
         statusCode: response.statusCode,
         byteLength: response.body?.byteLength ?? 0,
         contentType: contentType,
+        contentEncoding: contentEncoding,
         elapsedMs: Date.now() - startedAt,
-        effectiveUrl: response.effectiveUrl?.toString() ?? url
+        effectiveUrl: response.effectiveUrl?.toString() ?? url,
+        sha256: ResponseFingerprint.sha256Hex(response.body)
       };
       if (body === null) {
         return {
@@ -118,8 +129,10 @@ export class RcpForumTransport implements ForumTransport {
           statusCode: 0,
           byteLength: 0,
           contentType: '',
+          contentEncoding: '',
           elapsedMs: Date.now() - startedAt,
-          effectiveUrl: url
+          effectiveUrl: url,
+          sha256: ''
         },
         body: '',
         error: this.classifyException(error as BusinessError)

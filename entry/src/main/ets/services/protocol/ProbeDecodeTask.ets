@@ -1,6 +1,7 @@
 import { taskpool } from '@kit.ArkTS';
 import { HomeProbeDecoder } from './HomeProbeDecoder';
 import { TopicProbeDecoder } from './TopicProbeDecoder';
+import { TopicStructureProbe } from './TopicStructureProbe';
 import { BackgroundProbeDecodeResult, ProbeDecodeKind, ProbeDecodeWireResult } from './ProbeModels';
 
 @Concurrent
@@ -18,12 +19,14 @@ export function executeProbeDecode(kind: ProbeDecodeKind, html: string, inputByt
     };
   } else {
     const topic = new TopicProbeDecoder().decode(html, topicId);
+    const topicStructure = new TopicStructureProbe().scan(html);
     wire = {
       kind: 'topic',
       parseMs: Date.now() - startedAt,
       inputBytes: inputBytes,
       outputCount: 1 + topic.replies.length,
-      topic: topic
+      topic: topic,
+      topicStructure: topicStructure
     };
   }
   return JSON.stringify(wire);
@@ -49,12 +52,14 @@ export class ProbeDecodeTaskRunner {
         };
       } else {
         const topic = new TopicProbeDecoder().decode(html, topicId);
+        const topicStructure = new TopicStructureProbe().scan(html);
         wire = {
           kind: 'topic',
           parseMs: Date.now() - startedAt,
           inputBytes: inputBytes,
           outputCount: 1 + topic.replies.length,
-          topic: topic
+          topic: topic,
+          topicStructure: topicStructure
         };
       }
       return this.withExecution(wire, 'UI_FALLBACK', this.safeErrorMessage(error));
@@ -69,6 +74,7 @@ export class ProbeDecodeTaskRunner {
       outputCount: wire.outputCount,
       home: wire.home,
       topic: wire.topic,
+      topicStructure: wire.topicStructure,
       execution: execution,
       executionWarning: warning
     };
