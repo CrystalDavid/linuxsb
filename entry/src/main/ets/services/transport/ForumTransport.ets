@@ -25,6 +25,8 @@ export interface TransportProbeMetadata {
   elapsedMs: number;
   effectiveUrl: string;
   sha256: string;
+  etag?: string;
+  lastModified?: string;
 }
 
 export interface TransportProbeResponse {
@@ -40,9 +42,14 @@ export enum TransportCachePolicy {
 
 export interface ForumTransport {
   getHome(cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
-  getTopic(topicId: number, cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
+  getTopic(topicId: number, cachePolicy?: TransportCachePolicy,
+    allowConditional?: boolean): Promise<TransportProbeResponse>;
   getAuthenticatedTopic(topicId: number, cookieHeader: string,
-    cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
+    cachePolicy?: TransportCachePolicy, allowConditional?: boolean): Promise<TransportProbeResponse>;
+  getTopicPage?(topicId: number, pageUrl: string,
+    cachePolicy?: TransportCachePolicy, allowConditional?: boolean): Promise<TransportProbeResponse>;
+  getAuthenticatedTopicPage?(topicId: number, pageUrl: string, cookieHeader: string,
+    cachePolicy?: TransportCachePolicy, allowConditional?: boolean): Promise<TransportProbeResponse>;
   getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse>;
   cancelAll(): void;
   close(): void;

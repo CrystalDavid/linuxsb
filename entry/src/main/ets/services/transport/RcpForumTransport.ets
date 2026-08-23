@@ -14,22 +14,42 @@ const FORUM_ORIGIN = 'https://linux.sb';
 const PROBE_USER_AGENT = 'ShaobingCommunity-P0/0.1 (HarmonyOS; technical-probe)';
 const PRODUCT_USER_AGENT = 'ShaobingCommunity/1.0 (HarmonyOS; read-only)';
 
+class ResponseValidator {
+  etag: string = '';
+  lastModified: string = '';
+}
+
 export class RcpForumTransport implements ForumTransport {
   private session: rcp.Session | undefined = undefined;
   private activeRequests: rcp.Request[] = [];
+  private validators: Map<string, ResponseValidator> = new Map<string, ResponseValidator>();
 
   async getHome(cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
     return this.get(`${FORUM_ORIGIN}/`, '', cachePolicy);
   }
 
   async getTopic(topicId: number,
-    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, '', cachePolicy);
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product,
+    allowConditional: boolean = false): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, '', cachePolicy, allowConditional);
   }
 
   async getAuthenticatedTopic(topicId: number, cookieHeader: string,
-    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
-    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, cookieHeader, cachePolicy);
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product,
+    allowConditional: boolean = false): Promise<TransportProbeResponse> {
+    return this.get(`${FORUM_ORIGIN}/topic/${topicId}`, cookieHeader, cachePolicy, allowConditional);
+  }
+
+  async getTopicPage(topicId: number, pageUrl: string,
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product,
+    allowConditional: boolean = false): Promise<TransportProbeResponse> {
+    return this.get(this.validatedTopicPageUrl(topicId, pageUrl), '', cachePolicy, allowConditional);
+  }
+
+  async getAuthenticatedTopicPage(topicId: number, pageUrl: string, cookieHeader: string,
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product,
+    allowConditional: boolean = false): Promise<TransportProbeResponse> {
+    return this.get(this.validatedTopicPageUrl(topicId, pageUrl), cookieHeader, cachePolicy, allowConditional);
   }
 
   async getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse> {
@@ -69,7 +89,7 @@ export class RcpForumTransport implements ForumTransport {
   }
 
   private async get(url: string, cookieHeader: string,
-    cachePolicy: TransportCachePolicy): Promise<TransportProbeResponse> {
+    cachePolicy: TransportCachePolicy, allowConditional: boolean = false): Promise<TransportProbeResponse> {
     const startedAt = Date.now();
     const session = this.ensureSession();
     if (session === undefined) {
@@ -98,6 +118,15 @@ export class RcpForumTransport implements ForumTransport {
     if (cookieHeader.length > 0) {
       headers['cookie'] = cookieHeader;
     }
+    const validatorKey = `${cookieHeader.length > 0 ? 'auth' : 'anon'}:${url}`;
+    const validator = cachePolicy === TransportCachePolicy.Product && allowConditional ?
+      this.validators.get(validatorKey) : undefined;
+    if (validator !== undefined && validator.etag.length > 0) {
+      headers['if-none-match'] = validator.etag;
+    }
+    if (validator !== undefined && validator.lastModified.length > 0) {
+      headers['if-modified-since'] = validator.lastModified;
+    }
     const request = new rcp.Request(url, 'GET', headers);
     request.destination = 'array-buffer';
     if (cachePolicy === TransportCachePolicy.ProbeNoStore) {
@@ -109,6 +138,15 @@ export class RcpForumTransport implements ForumTransport {
       const response = await session.fetch(request);
       const contentType = this.headerValue(response.headers['content-type']);
       const contentEncoding = this.headerValue(response.headers['content-encoding']);
+      const etag = this.headerValue(response.headers['etag']);
+      const lastModified = this.headerValue(response.headers['last-modified']);
+      if (cachePolicy === TransportCachePolicy.Product && response.statusCode >= 200 && response.statusCode < 300 &&
+        (etag.length > 0 || lastModified.length > 0)) {
+        const nextValidator = new ResponseValidator();
+        nextValidator.etag = etag;
+        nextValidator.lastModified = lastModified;
+        this.validators.set(validatorKey, nextValidator);
+      }
       const body = response.toString();
       const metadata: TransportProbeMetadata = {
         statusCode: response.statusCode,
@@ -117,7 +155,9 @@ export class RcpForumTransport implements ForumTransport {
         contentEncoding: contentEncoding,
         elapsedMs: Date.now() - startedAt,
         effectiveUrl: response.effectiveUrl?.toString() ?? url,
-        sha256: ResponseFingerprint.sha256Hex(response.body)
+        sha256: ResponseFingerprint.sha256Hex(response.body),
+        etag: etag,
+        lastModified: lastModified
       };
       if (body === null) {
         return {
@@ -154,6 +194,14 @@ export class RcpForumTransport implements ForumTransport {
     }
   }
 
+  private validatedTopicPageUrl(topicId: number, pageUrl: string): string {
+    const canonical = `${FORUM_ORIGIN}/topic/${topicId}`;
+    if (pageUrl === canonical || pageUrl.startsWith(`${canonical}?`)) {
+      return pageUrl;
+    }
+    return canonical;
+  }
+
   private ensureSession(): rcp.Session | undefined {
     if (this.session !== undefined) {
       return this.session;
@@ -180,6 +228,9 @@ export class RcpForumTransport implements ForumTransport {
   }
 
   private classifyResponse(statusCode: number, contentType: string): TransportProbeError | undefined {
+    if (statusCode === 304) {
+      return undefined;
+    }
     if (statusCode >= 300 && statusCode < 400) {
       return { kind: 'REDIRECT', code: statusCode, message: 'Unexpected redirect response.' };
     }

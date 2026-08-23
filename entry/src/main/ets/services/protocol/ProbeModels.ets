@@ -43,6 +43,11 @@ export interface TopicProbeResult {
   advertisedReplyCount: number;
   mainPostId: number;
   replies: ReplyProbeSummary[];
+  currentPage: number;
+  pageReplyCount: number;
+  totalPages: number;
+  nextPageUrl: string;
+  loginVisibleMarkerCount: number;
   warnings: string[];
 }
 

@@ -1,4 +1,4 @@
-import { CookieProbeSummary, CookieSessionBroker, cookieSessionBroker } from '../transport/CookieSessionBroker';
+import { CookieProbeSummary, CookieSessionBroker, cookieSessionBroker } from './CookieSessionBroker';
 
 export interface AuthSessionPort {
   getRequestCookieHeader(): string | undefined;

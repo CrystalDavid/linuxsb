@@ -89,6 +89,10 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
       replies: replies,
       posts: posts,
       loginVisibleMarkerCount: structure.loginVisibleMarkerCount,
+      currentPage: topic.currentPage,
+      pageReplyCount: topic.pageReplyCount,
+      totalPages: topic.totalPages,
+      nextPageUrl: topic.nextPageUrl,
       warnings: topic.warnings
     }
   };

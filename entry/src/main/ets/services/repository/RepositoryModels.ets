@@ -46,6 +46,7 @@ export interface HomeDataSourcePort {
 export interface TopicDataSourcePort {
   loadTopic(topicId: number, forceRefresh?: boolean): Promise<TopicLoadResult>;
   peekTopic?(topicId: number): TopicDetail | undefined;
+  loadNextReplyPage?(topicId: number): Promise<TopicLoadResult>;
   prefetchTopic?(topicId: number): Promise<void>;
   clearTopicCache?(): void;
   captureOfficialLogin(): boolean;

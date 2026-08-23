@@ -1,6 +1,6 @@
 import { webview } from '@kit.ArkWeb';
 import { AppSpacing, AppTypography } from '../../common/theme/AppTheme';
-import { CookieProbeSummary, cookieSessionBroker } from '../transport/CookieSessionBroker';
+import { CookieProbeSummary, cookieSessionBroker } from './CookieSessionBroker';
 
 const LOGIN_URL = 'https://linux.sb/login';
 

@@ -1,7 +1,7 @@
 import { HtmlToken, HtmlTokenType, LightweightHtmlTokenizer } from '../protocol/LightweightHtmlTokenizer';
 import { collapseWhitespace } from '../protocol/HtmlProbeUtils';
 import { ForumTransport } from '../transport/ForumTransport';
-import { CookieSessionBroker } from '../transport/CookieSessionBroker';
+import { CookieSessionBroker } from './CookieSessionBroker';
 
 export interface AuthenticatedSessionProbeResult {
   attempted: boolean;

@@ -30,11 +30,26 @@ export interface ProtocolContentBlock {
   description: string;
 }
 
+export interface ProtocolEditedMetadata {
+  editorName: string;
+  editedAt: string;
+}
+
+export interface ProtocolRewardExtension {
+  label: string;
+  url: string;
+}
+
 export interface ProtocolPostDocument {
   postId: number;
   floor: number;
   author: string;
+  authorId?: number;
+  authorAvatarUrl?: string;
+  postedAtLabel?: string;
   blocks: ProtocolContentBlock[];
+  editedMetadata?: ProtocolEditedMetadata;
+  rewardExtension?: ProtocolRewardExtension;
 }
 
 export interface TopicProtocolReply {
@@ -54,6 +69,10 @@ export interface TopicProtocolDocument {
   replies: TopicProtocolReply[];
   posts: ProtocolPostDocument[];
   loginVisibleMarkerCount: number;
+  currentPage?: number;
+  pageReplyCount?: number;
+  totalPages?: number;
+  nextPageUrl?: string;
   warnings: string[];
 }
 

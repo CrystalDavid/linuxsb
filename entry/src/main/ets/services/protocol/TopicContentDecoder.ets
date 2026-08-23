@@ -1,6 +1,11 @@
 import { HtmlToken, HtmlTokenType, LightweightHtmlTokenizer } from './LightweightHtmlTokenizer';
 import { collapseWhitespace, hasClass, parseFirstUnsigned, parsePrefixedId } from './HtmlProbeUtils';
-import { ProtocolContentBlock, ProtocolPostDocument } from './ProductProtocolModels';
+import {
+  ProtocolContentBlock,
+  ProtocolEditedMetadata,
+  ProtocolPostDocument,
+  ProtocolRewardExtension
+} from './ProductProtocolModels';
 
 const MAX_BLOCKS_PER_POST = 64;
 const MAX_TEXT_PER_BLOCK = 8192;
@@ -9,22 +14,40 @@ class PostContentDraft {
   postId: number = 0;
   floor: number = 0;
   author: string = '';
+  authorId: number = 0;
+  authorAvatarUrl: string = '';
+  postedAtLabel: string = '';
   blocks: ProtocolContentBlock[] = [];
   unsupportedTags: Set<string> = new Set<string>();
+  editedMetadata: ProtocolEditedMetadata | undefined = undefined;
+  rewardExtension: ProtocolRewardExtension | undefined = undefined;
 }
 
+/** Streaming, depth-aware post decoder. BBS1 interaction chrome is never emitted as body text. */
 export class TopicContentDecoder {
   decode(html: string): ProtocolPostDocument[] {
     const posts: ProtocolPostDocument[] = [];
+    let treeDepth = 0;
     let currentPost: PostContentDraft | undefined = undefined;
-    let postListItemDepth = 0;
-    let authorDepth = 0;
+    let postRootDepth = 0;
+    let authorRootDepth = 0;
     let authorText = '';
-    let contentDepth = 0;
+    let postMetaRootDepth = 0;
+    let postMetaText = '';
+    let postContentRootDepth = 0;
+    let bodyRootDepth = 0;
+    let skippedRootDepth = 0;
+    let editedRootDepth = 0;
+    let editedText = '';
+    let editedLinkRootDepth = 0;
+    let editedEditorText = '';
+    let rewardRootDepth = 0;
+    let rewardText = '';
+    let rewardUrl = '';
     let pendingText = '';
     let captureKind = '';
     let captureTag = '';
-    let captureDepth = 0;
+    let captureRootDepth = 0;
     let captureText = '';
     let captureUrl = '';
 
@@ -44,7 +67,7 @@ export class TopicContentDecoder {
       if (currentPost === undefined || captureKind.length === 0) {
         captureKind = '';
         captureTag = '';
-        captureDepth = 0;
+        captureRootDepth = 0;
         captureText = '';
         captureUrl = '';
         return;
@@ -55,58 +78,145 @@ export class TopicContentDecoder {
       }
       captureKind = '';
       captureTag = '';
-      captureDepth = 0;
+      captureRootDepth = 0;
       captureText = '';
       captureUrl = '';
     };
 
+    const finishEditedMetadata = (): void => {
+      if (currentPost !== undefined) {
+        const value = collapseWhitespace(editedText);
+        if (value.length > 0) {
+          const editedMarker = value.indexOf('编辑于');
+          currentPost.editedMetadata = {
+            editorName: collapseWhitespace(editedEditorText),
+            editedAt: editedMarker >= 0 ? value.substring(editedMarker + 3).trim() : value
+          };
+        }
+      }
+      editedText = '';
+      editedEditorText = '';
+      editedLinkRootDepth = 0;
+      editedRootDepth = 0;
+    };
+
+    const finishRewardExtension = (): void => {
+      if (currentPost !== undefined) {
+        let label = collapseWhitespace(rewardText);
+        if (label.startsWith('$')) {
+          label = label.substring(1).trim();
+        }
+        if (label.length > 0 || rewardUrl.length > 0) {
+          currentPost.rewardExtension = { label: label.length > 0 ? label : '打赏', url: rewardUrl };
+        }
+      }
+      rewardText = '';
+      rewardUrl = '';
+      rewardRootDepth = 0;
+    };
+
     new LightweightHtmlTokenizer().scan(html, (token: HtmlToken) => {
       if (token.type === HtmlTokenType.START_TAG) {
-        if (token.name === 'li' && hasClass(token.attributes, 'post-entry') && currentPost === undefined) {
-          currentPost = new PostContentDraft();
-          currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
-          currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
-          postListItemDepth = 1;
-          return;
+        const structural = !token.selfClosing && !this.isVoidTag(token.name);
+        if (structural) {
+          treeDepth++;
         }
+
         if (currentPost === undefined) {
-          return;
-        }
-        if (token.name === 'li' && !this.isVoidTag(token.name) && !token.selfClosing) {
-          postListItemDepth++;
-        }
-        if (token.name === 'a' && hasClass(token.attributes, 'post-author') && contentDepth === 0) {
-          authorDepth = 1;
-          authorText = '';
-          return;
-        }
-        if (authorDepth > 0 && !token.selfClosing && !this.isVoidTag(token.name)) {
-          authorDepth++;
-          return;
-        }
-        if (token.name === 'div' && hasClass(token.attributes, 'post-content') && contentDepth === 0) {
-          contentDepth = 1;
-          pendingText = '';
-          return;
-        }
-        if (contentDepth <= 0) {
+          if (token.name === 'li' && hasClass(token.attributes, 'post-entry')) {
+            currentPost = new PostContentDraft();
+            currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
+            currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
+            postRootDepth = treeDepth;
+          }
           return;
         }
 
-        if (!token.selfClosing && !this.isVoidTag(token.name)) {
-          contentDepth++;
+        if (token.name === 'a' && hasClass(token.attributes, 'post-author') && postContentRootDepth === 0) {
+          authorRootDepth = treeDepth;
+          authorText = '';
+          currentPost.authorId = this.userIdFromUrl(token.attributes.get('href') ?? '');
+          return;
+        }
+        if (token.name === 'img' && hasClass(token.attributes, 'avatar-img') && postContentRootDepth === 0 &&
+          currentPost.authorAvatarUrl.length === 0) {
+          currentPost.authorAvatarUrl = this.normalizeUrl(token.attributes.get('src') ?? '');
+          return;
+        }
+        if (token.name === 'div' && hasClass(token.attributes, 'post-meta') && postContentRootDepth === 0) {
+          postMetaRootDepth = treeDepth;
+          postMetaText = '';
+          return;
+        }
+        if (token.name === 'div' && hasClass(token.attributes, 'post-content') && postContentRootDepth === 0) {
+          postContentRootDepth = treeDepth;
+          pendingText = '';
+          return;
+        }
+        if (this.isEditedMetadata(token)) {
+          finishCapture();
+          flushPendingText();
+          editedRootDepth = treeDepth;
+          editedText = '';
+          editedEditorText = '';
+          editedLinkRootDepth = 0;
+          return;
+        }
+        if (this.isRewardExtension(token)) {
+          finishCapture();
+          flushPendingText();
+          rewardRootDepth = treeDepth;
+          rewardText = '';
+          rewardUrl = '';
+          return;
+        }
+        if (rewardRootDepth > 0) {
+          if (token.name === 'a' && rewardUrl.length === 0) {
+            rewardUrl = this.normalizeUrl(token.attributes.get('href') ?? '');
+          }
+          return;
+        }
+        if (editedRootDepth > 0) {
+          if (token.name === 'a') {
+            editedLinkRootDepth = treeDepth;
+            editedEditorText = '';
+          }
+          return;
+        }
+        if (skippedRootDepth > 0) {
+          return;
+        }
+        if (this.isInteractionChrome(token)) {
+          finishCapture();
+          flushPendingText();
+          skippedRootDepth = treeDepth;
+          return;
+        }
+        if (postContentRootDepth <= 0) {
+          return;
+        }
+        if (token.name === 'div' && hasClass(token.attributes, 'long-content-fold-content')) {
+          bodyRootDepth = treeDepth;
+          return;
+        }
+        if (bodyRootDepth > 0 && treeDepth < bodyRootDepth) {
+          return;
         }
         if (captureKind.length > 0) {
           if (token.name === 'br') {
             captureText += '\n';
-          } else if (!token.selfClosing && !this.isVoidTag(token.name)) {
-            captureDepth++;
           }
           return;
         }
 
         if (token.name === 'p') {
           flushPendingText();
+        } else if (this.isHeadingTag(token.name)) {
+          flushPendingText();
+          captureKind = 'Heading';
+          captureTag = token.name;
+          captureRootDepth = treeDepth;
+          captureText = '';
         } else if (token.name === 'br') {
           flushPendingText();
           this.addBlock(currentPost, 'LineBreak', '', '', '');
@@ -114,26 +224,32 @@ export class TopicContentDecoder {
           flushPendingText();
           captureKind = 'Link';
           captureTag = 'a';
-          captureDepth = 1;
+          captureRootDepth = treeDepth;
           captureText = '';
           captureUrl = this.normalizeUrl(token.attributes.get('href') ?? '');
         } else if (token.name === 'blockquote') {
           flushPendingText();
           captureKind = 'Quote';
           captureTag = 'blockquote';
-          captureDepth = 1;
+          captureRootDepth = treeDepth;
           captureText = '';
         } else if (token.name === 'pre') {
           flushPendingText();
           captureKind = 'CodeBlock';
           captureTag = 'pre';
-          captureDepth = 1;
+          captureRootDepth = treeDepth;
           captureText = '';
         } else if (token.name === 'code') {
           flushPendingText();
           captureKind = 'InlineCode';
           captureTag = 'code';
-          captureDepth = 1;
+          captureRootDepth = treeDepth;
+          captureText = '';
+        } else if (token.name === 'li') {
+          flushPendingText();
+          captureKind = 'ListItem';
+          captureTag = 'li';
+          captureRootDepth = treeDepth;
           captureText = '';
         } else if (token.name === 'img') {
           flushPendingText();
@@ -146,8 +262,6 @@ export class TopicContentDecoder {
           flushPendingText();
           currentPost.unsupportedTags.add(token.name);
           this.addBlock(currentPost, 'UnsupportedExtension', '', '', token.name);
-        } else if (token.name === 'li') {
-          pendingText += ' • ';
         }
         return;
       }
@@ -156,9 +270,18 @@ export class TopicContentDecoder {
         if (currentPost === undefined) {
           return;
         }
-        if (authorDepth > 0) {
+        if (authorRootDepth > 0) {
           authorText += token.text;
-        } else if (contentDepth > 0) {
+        } else if (postMetaRootDepth > 0) {
+          postMetaText += token.text;
+        } else if (editedRootDepth > 0) {
+          editedText += token.text;
+          if (editedLinkRootDepth > 0) {
+            editedEditorText += token.text;
+          }
+        } else if (rewardRootDepth > 0) {
+          rewardText += token.text;
+        } else if (skippedRootDepth === 0 && postContentRootDepth > 0) {
           if (captureKind.length > 0) {
             if (captureText.length < MAX_TEXT_PER_BLOCK) {
               captureText += token.text.substring(0, MAX_TEXT_PER_BLOCK - captureText.length);
@@ -171,40 +294,64 @@ export class TopicContentDecoder {
       }
 
       if (token.type !== HtmlTokenType.END_TAG || currentPost === undefined) {
+        if (token.type === HtmlTokenType.END_TAG && treeDepth > 0) {
+          treeDepth--;
+        }
         return;
       }
-      if (authorDepth > 0) {
-        authorDepth--;
-        if (authorDepth === 0 && token.name === 'a') {
-          currentPost.author = collapseWhitespace(authorText);
-          authorText = '';
-        }
+      if (captureRootDepth > 0 && treeDepth === captureRootDepth && token.name === captureTag) {
+        finishCapture();
+      } else if (captureKind.length === 0 && token.name === 'p' && skippedRootDepth === 0 && editedRootDepth === 0) {
+        flushPendingText();
       }
-      if (contentDepth > 0) {
-        if (captureKind.length > 0) {
-          captureDepth--;
-          if (captureDepth === 0 && token.name === captureTag) {
-            finishCapture();
-          }
-        } else if (token.name === 'p') {
-          flushPendingText();
-        }
-        contentDepth--;
-        if (contentDepth === 0) {
-          finishCapture();
-          flushPendingText();
-        }
+      if (authorRootDepth > 0 && treeDepth === authorRootDepth && token.name === 'a') {
+        currentPost.author = collapseWhitespace(authorText);
+        authorText = '';
+        authorRootDepth = 0;
       }
-      if (token.name === 'li') {
-        postListItemDepth--;
-        if (postListItemDepth === 0) {
-          finishCapture();
-          flushPendingText();
-          this.finalizePost(currentPost, posts);
-          currentPost = undefined;
-          authorDepth = 0;
-          contentDepth = 0;
-        }
+      if (postMetaRootDepth > 0 && treeDepth === postMetaRootDepth && token.name === 'div') {
+        currentPost.postedAtLabel = collapseWhitespace(postMetaText);
+        postMetaText = '';
+        postMetaRootDepth = 0;
+      }
+      if (editedLinkRootDepth > 0 && treeDepth === editedLinkRootDepth && token.name === 'a') {
+        editedLinkRootDepth = 0;
+      }
+      if (editedRootDepth > 0 && treeDepth === editedRootDepth) {
+        finishEditedMetadata();
+      }
+      if (rewardRootDepth > 0 && treeDepth === rewardRootDepth) {
+        finishRewardExtension();
+      }
+      if (skippedRootDepth > 0 && treeDepth === skippedRootDepth) {
+        skippedRootDepth = 0;
+      }
+      if (bodyRootDepth > 0 && treeDepth === bodyRootDepth) {
+        finishCapture();
+        flushPendingText();
+        bodyRootDepth = 0;
+      }
+      if (postContentRootDepth > 0 && treeDepth === postContentRootDepth) {
+        finishCapture();
+        flushPendingText();
+        postContentRootDepth = 0;
+      }
+      if (postRootDepth > 0 && treeDepth === postRootDepth && token.name === 'li') {
+        finishCapture();
+        flushPendingText();
+        this.finalizePost(currentPost, posts);
+        currentPost = undefined;
+        postRootDepth = 0;
+        authorRootDepth = 0;
+        postMetaRootDepth = 0;
+        postContentRootDepth = 0;
+        bodyRootDepth = 0;
+        skippedRootDepth = 0;
+        editedRootDepth = 0;
+        rewardRootDepth = 0;
+      }
+      if (treeDepth > 0) {
+        treeDepth--;
       }
     });
 
@@ -231,8 +378,36 @@ export class TopicContentDecoder {
       postId: post.postId,
       floor: post.floor,
       author: post.author,
-      blocks: post.blocks
+      authorId: post.authorId,
+      authorAvatarUrl: post.authorAvatarUrl,
+      postedAtLabel: post.postedAtLabel,
+      blocks: post.blocks,
+      editedMetadata: post.editedMetadata,
+      rewardExtension: post.rewardExtension
     });
+  }
+
+  private isEditedMetadata(token: HtmlToken): boolean {
+    return hasClass(token.attributes, 'post-edit-meta') || hasClass(token.attributes, 'post-edited') ||
+      hasClass(token.attributes, 'edited-metadata') || hasClass(token.attributes, 'post-edit-history') ||
+      hasClass(token.attributes, 'sb-limit-edit-time-note') || token.attributes.has('data-post-edited');
+  }
+
+  private isRewardExtension(token: HtmlToken): boolean {
+    return hasClass(token.attributes, 'donate-area') || token.attributes.has('data-donate-area');
+  }
+
+  private isInteractionChrome(token: HtmlToken): boolean {
+    return hasClass(token.attributes, 'long-content-fold-actions') ||
+      hasClass(token.attributes, 'long-content-fold-toggle') ||
+      hasClass(token.attributes, 'quick-reply-main-action') ||
+      hasClass(token.attributes, 'post-ops') ||
+      hasClass(token.attributes, 'reply-panel') ||
+      hasClass(token.attributes, 'replies-login-visible');
+  }
+
+  private isHeadingTag(name: string): boolean {
+    return name === 'h1' || name === 'h2' || name === 'h3' || name === 'h4' || name === 'h5' || name === 'h6';
   }
 
   private normalizeUrl(value: string): string {
@@ -246,6 +421,12 @@ export class TopicContentDecoder {
       return `https://linux.sb${value}`;
     }
     return value;
+  }
+
+  private userIdFromUrl(value: string): number {
+    const marker = '/user/';
+    const markerIndex = value.indexOf(marker);
+    return markerIndex < 0 ? 0 : parseFirstUnsigned(value.substring(markerIndex + marker.length));
   }
 
   private isUnsupportedExtensionTag(name: string): boolean {

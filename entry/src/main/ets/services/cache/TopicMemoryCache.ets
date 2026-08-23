@@ -3,6 +3,7 @@ import { TopicDetail } from '../../models/TopicModels';
 export interface TopicCacheLookup {
   hit: boolean;
   ageMs: number;
+  stale?: boolean;
   data?: TopicDetail;
 }
 
@@ -28,19 +29,28 @@ export class TopicMemoryCache {
   }
 
   get(topicId: number, authenticated: boolean): TopicCacheLookup {
+    const lookup = this.lookup(topicId, authenticated);
+    if (lookup.stale === true) {
+      return { hit: false, ageMs: lookup.ageMs, stale: true, data: lookup.data };
+    }
+    return lookup;
+  }
+
+  peek(topicId: number, authenticated: boolean): TopicCacheLookup {
+    return this.lookup(topicId, authenticated);
+  }
+
+  private lookup(topicId: number, authenticated: boolean): TopicCacheLookup {
     const key = this.key(topicId, authenticated);
     const entry = this.entries.get(key);
     if (entry === undefined || entry.data === undefined) {
       return { hit: false, ageMs: 0 };
     }
     const ageMs = Math.max(0, this.clock() - entry.storedAt);
-    if (ageMs > this.ttlMs) {
-      this.entries.delete(key);
-      return { hit: false, ageMs: ageMs };
-    }
+    const stale = ageMs > this.ttlMs;
     this.entries.delete(key);
     this.entries.set(key, entry);
-    return { hit: true, ageMs: ageMs, data: entry.data };
+    return { hit: true, ageMs: ageMs, stale: stale, data: entry.data };
   }
 
   put(topicId: number, authenticated: boolean, data: TopicDetail): void {

@@ -1,5 +1,7 @@
 export enum ContentBlockKind {
   Paragraph = 'Paragraph',
+  Heading = 'Heading',
+  ListItem = 'ListItem',
   LineBreak = 'LineBreak',
   Link = 'Link',
   Quote = 'Quote',
