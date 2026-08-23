@@ -1,5 +1,5 @@
 import { TopicDetail } from '../models/TopicModels';
-import { TopicDetailUiModel, TopicUiModel } from '../models/presentation/ForumUiModels';
+import { ReplyUiModel, TopicDetailUiModel, TopicUiModel } from '../models/presentation/ForumUiModels';
 import { TopicOpenTrace } from '../services/logging/TopicOpenTrace';
 import { TopicPresentationMapper } from '../services/presentation/TopicPresentationMapper';
 import { RepositoryDiagnostics, RepositoryFailureKind, TopicDataSourcePort, emptyDiagnostics } from '../services/repository/RepositoryModels';
@@ -14,6 +14,9 @@ export class TopicDetailViewModel {
   summary: TopicUiModel | undefined = undefined;
   errorMessage: string = '';
   loginError: string = '';
+  loadingMore: boolean = false;
+  loadMoreError: string = '';
+  mountedReplyCount: number = 10;
   diagnostics: RepositoryDiagnostics = emptyDiagnostics();
   private dataSource: TopicDataSourcePort;
   private mapper: TopicPresentationMapper;
@@ -32,6 +35,9 @@ export class TopicDetailViewModel {
     const generation = ++this.generation;
     this.topicId = topicId;
     this.summary = summary;
+    this.mountedReplyCount = 10;
+    this.loadingMore = false;
+    this.loadMoreError = '';
     const cached = this.dataSource.peekTopic === undefined ? undefined : this.dataSource.peekTopic(topicId);
     if (cached !== undefined) {
       this.applyDetail(cached);
@@ -74,10 +80,56 @@ export class TopicDetailViewModel {
     TopicOpenTrace.markMappingComplete(detail.topicId);
   }
 
+  visibleReplies(): ReplyUiModel[] {
+    const replies = this.presentationDetail?.replies ?? [];
+    return replies.slice(0, Math.min(this.mountedReplyCount, replies.length));
+  }
+
+  async onReplyListViewport(lastVisibleListIndex: number): Promise<void> {
+    // The first four list items are spacer, topic summary, main post and reply summary.
+    const visibleReplyIndex = lastVisibleListIndex - 4;
+    const triggerReplyIndex = Math.max(0, this.mountedReplyCount - 3);
+    if (visibleReplyIndex < triggerReplyIndex) {
+      return;
+    }
+    await this.onReplyListReachEnd();
+  }
+
+  async onReplyListReachEnd(): Promise<void> {
+    const detail = this.presentationDetail;
+    if (detail === undefined) {
+      return;
+    }
+    if (this.mountedReplyCount < detail.replies.length) {
+      this.mountedReplyCount = Math.min(detail.replies.length, this.mountedReplyCount + 10);
+      return;
+    }
+    if (detail.nextPageUrl.length === 0 || this.loadingMore || this.dataSource.loadNextReplyPage === undefined) {
+      return;
+    }
+    this.loadingMore = true;
+    this.loadMoreError = '';
+    const result = await this.dataSource.loadNextReplyPage(this.topicId);
+    this.loadingMore = false;
+    if (!result.ok || result.data === undefined) {
+      this.loadMoreError = result.failure?.message ?? 'REPLY_PAGE_LOAD_FAILED';
+      return;
+    }
+    this.diagnostics = result.diagnostics;
+    this.applyDetail(result.data);
+    this.mountedReplyCount = Math.min(result.data.replies.length, this.mountedReplyCount + 10);
+  }
+
+  async retryLoadMore(): Promise<void> {
+    this.loadMoreError = '';
+    await this.onReplyListReachEnd();
+  }
+
   async retry(): Promise<void> {
     if (this.topicId > 0) {
       const generation = ++this.generation;
       this.state = ViewLoadState.Loading;
+      this.mountedReplyCount = 10;
       await this.refreshFromSource(this.topicId, true, generation, false);
     }
   }

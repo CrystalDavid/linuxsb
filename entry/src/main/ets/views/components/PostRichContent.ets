@@ -10,8 +10,20 @@ export struct PostRichContent {
   private blockView(block: ContentBlock) {
     if (block.kind === ContentBlockKind.Paragraph) {
       Text(block.text)
-        .fontSize(Typography.BODY_LARGE).lineHeight(Typography.READING_LINE_HEIGHT)
+        .fontSize(16).lineHeight(26)
         .fontColor(SemanticColors.textPrimary()).width('100%').copyOption(CopyOptions.LocalDevice)
+    } else if (block.kind === ContentBlockKind.Heading) {
+      Text(block.text)
+        .fontSize(19).lineHeight(27).fontWeight(FontWeight.Bold)
+        .fontColor(SemanticColors.textPrimary()).width('100%').copyOption(CopyOptions.LocalDevice)
+    } else if (block.kind === ContentBlockKind.ListItem) {
+      Row({ space: 8 }) {
+        Text('•').fontSize(18).fontColor(SemanticColors.textSecondary())
+        Text(block.text).fontSize(16).lineHeight(26).fontColor(SemanticColors.textPrimary())
+          .layoutWeight(1).copyOption(CopyOptions.LocalDevice)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
     } else if (block.kind === ContentBlockKind.LineBreak) {
       Blank().height(Spacing.SM)
     } else if (block.kind === ContentBlockKind.Link) {
@@ -48,6 +60,7 @@ export struct PostRichContent {
         .objectFit(ImageFit.Contain).backgroundColor(SemanticColors.surfaceMuted())
         .borderRadius(Radius.SM).draggable(false)
         .onAppear(() => TopicOpenTrace.markImageRequestsStart())
+        .onComplete(() => TopicOpenTrace.markFirstImageFrame())
     } else {
       Row({ space: Spacing.SM }) {
         SymbolGlyph($r('sys.symbol.puzzle')).fontSize(18)

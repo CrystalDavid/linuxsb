@@ -44,8 +44,15 @@ export class TopicPresentationMapper {
     output.mainPost = this.mapPost(source.mainPost);
     output.replyAccess = source.replyAccess;
     output.protocolVersion = source.protocolVersion;
-    for (let index = 0; index < source.replies.length; index++) {
-      output.replies.push(this.mapReply(source.replies[index]));
+    const replyPage = source.replyPage;
+    const replies = replyPage?.replies ?? source.replies;
+    output.currentPage = replyPage?.currentPage ?? 1;
+    output.pageReplyCount = replyPage?.pageReplyCount ?? replies.length;
+    output.loadedReplyCount = replyPage?.loadedReplyCount ?? replies.length;
+    output.totalPages = replyPage?.totalPages ?? 1;
+    output.nextPageUrl = replyPage?.nextPageUrl ?? '';
+    for (let index = 0; index < replies.length; index++) {
+      output.replies.push(this.mapReply(replies[index]));
     }
     return output;
   }
@@ -64,7 +71,10 @@ export class TopicPresentationMapper {
     output.postId = source.postId;
     output.floor = 0;
     output.author = this.mapAuthor(source.author);
+    output.postedAtLabel = source.postedAtLabel ?? '';
     output.content = source.content;
+    output.editedMetadata = source.editedMetadata;
+    output.rewardExtension = source.rewardExtension;
     return output;
   }
 
@@ -73,7 +83,10 @@ export class TopicPresentationMapper {
     output.postId = source.replyId;
     output.floor = source.floor;
     output.author = this.mapAuthor(source.author);
+    output.postedAtLabel = source.postedAtLabel ?? '';
     output.content = source.content;
+    output.editedMetadata = source.editedMetadata;
+    output.rewardExtension = source.rewardExtension;
     return output;
   }
 

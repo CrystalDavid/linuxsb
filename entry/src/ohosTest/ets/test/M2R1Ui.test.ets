@@ -1,6 +1,7 @@
 import { bundleManager, Want } from '@kit.AbilityKit';
 import { abilityDelegatorRegistry, Component, Driver, ON } from '@kit.TestKit';
 import { beforeEach, describe, expect, it } from '@ohos/hypium';
+import display from '@ohos.display';
 
 const WAIT_MS: number = 20000;
 const SETTLE_MS: number = 500;
@@ -64,18 +65,31 @@ export default function m2r1UiTest() {
       expect((await componentsByType('Web')).length).assertEqual(0);
     })
 
-    it('opens and closes the semantic 288vp filter drawer', 0, async () => {
+    it('keeps the Drawer geometry compact and closes semantically', 0, async () => {
       await (await componentById('home-menu')).click();
       const drawer = await componentById('category-drawer');
       const bounds = await drawer.getBounds();
-      expect(bounds.right > bounds.left).assertTrue();
-      expect(bounds.bottom > bounds.top).assertTrue();
+      const density = display.getDefaultDisplaySync().densityPixels;
+      const drawerWidthVp = (bounds.right - bounds.left) / density;
+      expect(Math.abs(drawerWidthVp - 288) <= 2).assertTrue();
+
+      const headerBounds = await (await componentById('category-drawer-header')).getBounds();
+      const filterBounds = await (await componentById('category-drawer-filters')).getBounds();
+      const firstRowBounds = await (await componentById('category-0')).getBounds();
+      const headerHeightVp = (headerBounds.bottom - headerBounds.top) / density;
+      const headerToFiltersVp = (filterBounds.top - headerBounds.bottom) / density;
+      const rowHeightVp = (firstRowBounds.bottom - firstRowBounds.top) / density;
+      expect(headerHeightVp >= 50 && headerHeightVp <= 58).assertTrue();
+      expect(headerToFiltersVp >= 0 && headerToFiltersVp <= 16).assertTrue();
+      expect(Math.abs(rowHeightVp - 48) <= 1).assertTrue();
+      await componentById('category-drawer-confirm-bar');
       await (await componentById('category-drawer-close')).click();
       await driver.delayMs(SETTLE_MS);
       expect(await hasId('category-drawer')).assertFalse();
     })
 
-    it('navigates immediately to Topic UI and returns without a Web node', 0, async () => {
+    it('NoWebOutsideLogin keeps Home and Topic native while navigating immediately', 0, async () => {
+      expect((await componentsByType('Web')).length).assertEqual(0);
       const firstTopic = await componentById('home-first-topic');
       await firstTopic.click();
       await componentById('topic-detail-page');

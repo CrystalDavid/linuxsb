@@ -1,5 +1,5 @@
 import { ContentBlock } from '../ContentBlock';
-import { ReplyAccess } from '../TopicModels';
+import { EditedMetadata, ReplyAccess, RewardExtension } from '../TopicModels';
 
 export class UserUiModel {
   userId: number = 0;
@@ -32,7 +32,10 @@ export class PostUiModel {
   postId: number = 0;
   floor: number = 0;
   author: UserUiModel = new UserUiModel();
+  postedAtLabel: string = '';
   content: ContentBlock[] = [];
+  editedMetadata: EditedMetadata | undefined = undefined;
+  rewardExtension: RewardExtension | undefined = undefined;
 }
 
 export class ReplyUiModel extends PostUiModel {}
@@ -44,6 +47,11 @@ export class TopicDetailUiModel {
   advertisedReplyCount: number = 0;
   mainPost: PostUiModel = new PostUiModel();
   replies: ReplyUiModel[] = [];
+  currentPage: number = 1;
+  pageReplyCount: number = 0;
+  loadedReplyCount: number = 0;
+  totalPages: number = 1;
+  nextPageUrl: string = '';
   replyAccess: ReplyAccess = ReplyAccess.Visible;
   protocolVersion: string = '';
 }

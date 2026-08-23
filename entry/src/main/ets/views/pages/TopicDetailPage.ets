@@ -1,5 +1,5 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
-import { AppColors, PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import { immersiveTitleBarContentTopSpacer } from '../../common/ui/ImmersiveTitleBarLayout';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
@@ -18,6 +18,7 @@ import { LoadStateView } from '../components/LoadStateView';
 import { LoginRequiredCard } from '../components/LoginRequiredCard';
 import { TopicDetailHeader } from '../components/TopicDetailHeader';
 import { TopicPostItem } from '../components/TopicPostItem';
+import { TopicSummaryCard } from '../components/TopicSummaryCard';
 
 @Component
 export struct TopicDetailPage {
@@ -28,10 +29,12 @@ export struct TopicDetailPage {
   onLogin: () => void = () => {};
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
   @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
+  @State private summaryVisible: boolean = true;
   private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     TopicOpenTrace.markDestinationAppear();
+    this.summaryVisible = true;
     if (this.topicId > 0) {
       this.viewModel.open(this.topicId, this.summary);
     }
@@ -50,56 +53,84 @@ export struct TopicDetailPage {
 
   private showWriteUnavailable(): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '写操作尚未开放', duration: 1800 });
+      this.getUIContext().getPromptAction().showToast({ message: '回复功能尚未开放', duration: 1800 });
     } catch (_) {}
+  }
+
+  private scrollToSummary(): void {
+    this.scroller.scrollToIndex(0, true, ScrollAlign.START);
   }
 
   @Builder
   private titleBarContent() {
-    TopicDetailHeader({ title: this.displayTitle(), categoryName: this.displayCategory() })
+    TopicDetailHeader({
+      summaryVisible: this.summaryVisible,
+      title: this.displayTitle(),
+      categoryName: this.displayCategory(),
+      onTitleClick: () => this.scrollToSummary()
+    })
   }
 
   @Builder
-  private topicIntro(detail: TopicDetailUiModel) {
-    Column({ space: Spacing.SM }) {
-      Text(detail.title)
-        .fontSize(Typography.HEADLINE)
+  private replySectionHeader(detail: TopicDetailUiModel) {
+    Row() {
+      Text(`${detail.loadedReplyCount} / ${detail.advertisedReplyCount} 条回复`)
+        .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
-        .lineHeight(31)
-        .width('100%')
-      Row({ space: Spacing.MD }) {
-        if (this.displayCategory().length > 0) {
-          Text(this.displayCategory())
-            .fontSize(Typography.CAPTION)
-            .fontColor(AppColors.brandPrimary())
-            .padding({ left: Spacing.SM, right: Spacing.SM, top: 3, bottom: 3 })
-            .backgroundColor(AppColors.brandSoft())
-            .borderRadius(Radius.XS)
-        }
-        Text(`${detail.viewCount} 次浏览`)
-          .fontSize(Typography.CAPTION)
+        .layoutWeight(1)
+      if (detail.totalPages > 1) {
+        Text(`第 ${detail.currentPage} / ${detail.totalPages} 页`)
+          .fontSize(12)
           .fontColor(SemanticColors.textSecondary())
       }
-      .width('100%')
     }
+    .id('topic-reply-summary')
     .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.MD })
-    .backgroundColor(SemanticColors.surface())
+    .padding({ left: 10, right: 10, top: 16, bottom: 8 })
+    .backgroundColor(SemanticColors.page())
+  }
+
+  @Builder
+  private loadMoreState(detail: TopicDetailUiModel) {
+    if (this.viewModel.loadingMore) {
+      Row({ space: 8 }) {
+        LoadingProgress().width(18).height(18).color(SemanticColors.textSecondary())
+        Text('正在加载下一页')
+          .fontSize(13)
+          .fontColor(SemanticColors.textSecondary())
+      }
+      .id('topic-load-more')
+      .width('100%')
+      .height(52)
+      .justifyContent(FlexAlign.Center)
+    } else if (this.viewModel.loadMoreError.length > 0) {
+      Button('下一页加载失败，点击重试')
+        .id('topic-load-more-retry')
+        .height(48)
+        .fontSize(13)
+        .fontColor($r('app.color.brand_primary'))
+        .backgroundColor(Color.Transparent)
+        .onClick(() => this.viewModel.retryLoadMore())
+    } else if (detail.nextPageUrl.length > 0 || this.viewModel.mountedReplyCount < detail.replies.length) {
+      Text('继续向下加载')
+        .fontSize(12)
+        .fontColor(SemanticColors.textTertiary())
+        .width('100%')
+        .height(40)
+        .textAlign(TextAlign.Center)
+    }
   }
 
   @Builder
   private detailContent(detail: TopicDetailUiModel) {
     List({ scroller: this.scroller }) {
       ListItem() {
-        Row() {
-          Blank()
-        }
-        .width('100%')
-        .height(immersiveTitleBarContentTopSpacer(this.topInset))
+        Row().width('100%').height(immersiveTitleBarContentTopSpacer(this.topInset))
       }
-      ListItem() { this.topicIntro(detail) }
+      ListItem() {
+        TopicSummaryCard({ detail: detail, summary: this.summary })
+      }
       ListItem() {
         TopicPostItem({ post: detail.mainPost, mainPost: true })
       }
@@ -109,40 +140,39 @@ export struct TopicDetailPage {
             replyCount: detail.advertisedReplyCount,
             onLogin: () => this.onLogin()
           })
-            .margin({ left: Spacing.MD, right: Spacing.MD, top: Spacing.MD, bottom: Spacing.MD })
+            .margin({ left: 10, right: 10, top: 12, bottom: 12 })
         }
-      } else if (detail.replies.length > 0) {
+      } else if (detail.advertisedReplyCount === 0) {
         ListItem() {
-          Row() {
-            Text(`${detail.replies.length} 条回复`)
-              .fontSize(Typography.TITLE_SMALL)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(SemanticColors.textPrimary())
-          }
-          .width('100%')
-          .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.SM })
-          .backgroundColor(SemanticColors.page())
+          Text('暂无回复')
+            .fontSize(14)
+            .fontColor(SemanticColors.textSecondary())
+            .width('100%')
+            .height(72)
+            .textAlign(TextAlign.Center)
         }
-        ForEach(detail.replies, (reply: ReplyUiModel) => {
+      } else {
+        ListItem() { this.replySectionHeader(detail) }
+        ForEach(this.viewModel.visibleReplies(), (reply: ReplyUiModel) => {
           ListItem() {
-            Column() {
-              TopicPostItem({ post: reply, mainPost: false })
-              Divider().color(SemanticColors.divider()).margin({ left: Spacing.MD, right: Spacing.MD })
-            }
+            TopicPostItem({ post: reply, mainPost: false })
           }
         }, (reply: ReplyUiModel) => reply.postId.toString())
+        ListItem() { this.loadMoreState(detail) }
       }
       ListItem() {
-        Row() {
-          Blank()
-        }
-        .width('100%')
-        .height(PageMetrics.REPLY_BAR_HEIGHT + this.bottomInset + Spacing.LG)
+        Row().width('100%').height(PageMetrics.REPLY_BAR_HEIGHT + this.bottomInset + 16)
       }
     }
     .id('topic-post-list')
-    .width('100%').height('100%')
+    .width('100%')
+    .height('100%')
     .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+    .onScrollIndex((start: number, end: number) => {
+      this.summaryVisible = start <= 1;
+      this.viewModel.onReplyListViewport(end);
+    })
     .onAppear(() => TopicOpenTrace.markFirstContentFrame())
   }
 
@@ -150,41 +180,47 @@ export struct TopicDetailPage {
   private skeleton() {
     List({ scroller: this.scroller }) {
       ListItem() {
-        Row() {
-          Blank()
-        }
-        .width('100%')
-        .height(immersiveTitleBarContentTopSpacer(this.topInset))
+        Row().width('100%').height(immersiveTitleBarContentTopSpacer(this.topInset))
       }
       ListItem() {
-        Column({ space: Spacing.MD }) {
+        Column({ space: 12 }) {
           Text(this.displayTitle())
-            .fontSize(Typography.HEADLINE)
+            .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .fontColor(SemanticColors.textPrimary())
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .width('100%')
-          Row({ space: Spacing.SM }) {
-            Row().width(36).height(36).borderRadius(Radius.PILL).backgroundColor(SemanticColors.skeleton())
-            Column({ space: Spacing.SM }) {
-              Row().width('38%').height(13).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
-              Row().width('22%').height(10).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          }.width('100%')
-          Row().width('100%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
-          Row().width('92%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
-          Row().width('76%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
-          Row().width('84%').height(16).borderRadius(Radius.XS).backgroundColor(SemanticColors.skeleton())
+          Row().width('45%').height(12).borderRadius(6).backgroundColor(SemanticColors.skeleton())
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
-        .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.LG, bottom: Spacing.XL })
+        .padding({ left: 10, right: 10, top: 20, bottom: 16 })
+        .border({ width: { bottom: 1 }, color: SemanticColors.divider() })
+        .backgroundColor(SemanticColors.surface())
+      }
+      ListItem() {
+        Column({ space: 12 }) {
+          Row({ space: 12 }) {
+            Row().width(40).height(40).borderRadius(20).backgroundColor(SemanticColors.skeleton())
+            Column({ space: 7 }) {
+              Row().width('38%').height(13).borderRadius(6).backgroundColor(SemanticColors.skeleton())
+              Row().width('22%').height(10).borderRadius(5).backgroundColor(SemanticColors.skeleton())
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%')
+          Row().width('100%').height(15).borderRadius(6).backgroundColor(SemanticColors.skeleton())
+          Row().width('92%').height(15).borderRadius(6).backgroundColor(SemanticColors.skeleton())
+          Row().width('76%').height(15).borderRadius(6).backgroundColor(SemanticColors.skeleton())
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 10, right: 10, top: 12, bottom: 20 })
         .backgroundColor(SemanticColors.surface())
       }
     }
     .id('topic-skeleton')
-    .width('100%').height('100%')
+    .width('100%')
+    .height('100%')
     .scrollBar(BarState.Off)
     .onAppear(() => TopicOpenTrace.markSkeletonFrame())
   }
@@ -218,7 +254,6 @@ export struct TopicDetailPage {
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       this.mainContent()
-
       HdsNavigation() {
         Column().width('100%').height('100%')
       }
@@ -239,14 +274,15 @@ export struct TopicDetailPage {
       .titleMode(HdsNavigationTitleMode.MINI)
       .mode(NavigationMode.Stack)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
-      .width('100%').height('100%')
+      .width('100%')
+      .height('100%')
       .backgroundColor(Color.Transparent)
       .hitTestBehavior(HitTestMode.Transparent)
-
       CommentInputBar({ onUnavailable: () => this.showWriteUnavailable() })
     }
     .id('topic-detail-page')
-    .width('100%').height('100%')
+    .width('100%')
+    .height('100%')
     .backgroundColor(SemanticColors.page())
   }
 }

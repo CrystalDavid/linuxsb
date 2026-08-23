@@ -12,7 +12,7 @@ export struct CommentInputBar {
         SymbolGlyph($r('sys.symbol.square_and_pencil'))
           .fontSize(18)
           .fontColor([SemanticColors.disabled()])
-        Text('写回复（尚未开放）')
+        Text('回复功能尚未开放')
           .fontSize(Typography.BODY)
           .fontColor(SemanticColors.disabled())
           .layoutWeight(1)
