@@ -230,6 +230,13 @@ export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
         diagnostics: diagnostics
       };
     }
+    if ((decoded.document.canonicalTopicId ?? 0) > 0 && decoded.document.canonicalTopicId !== topicId) {
+      return {
+        ok: false,
+        failure: { kind: RepositoryFailureKind.Protocol, message: 'TOPIC_IDENTITY_MISMATCH' },
+        diagnostics: diagnostics
+      };
+    }
     if (!decoded.document.protocolMatched) {
       return {
         ok: false,

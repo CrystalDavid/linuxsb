@@ -13,6 +13,7 @@ export struct OfficialLoginPage {
   @State private csrfPresent: boolean = false;
   @State private cookieHeaderLength: number = 0;
   @State private blockedRequestCount: number = 0;
+  @State private closing: boolean = false;
 
   aboutToDisappear(): void {
     try {
@@ -42,12 +43,10 @@ export struct OfficialLoginPage {
   }
 
   private finish(): void {
-    this.refreshCookieProbe();
-    try {
-      this.controller.stop();
-    } catch (_) {
-      // The controller may already be detached during a fast close.
+    if (this.closing) {
+      return;
     }
+    this.closing = true;
     this.onClose();
   }
 
@@ -66,7 +65,9 @@ export struct OfficialLoginPage {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
 
-        Button('完成并返回')
+        Button(this.closing ? '正在返回' : '完成并返回')
+          .id('official-login-complete')
+          .enabled(!this.closing)
           .onClick(() => this.finish())
       }
       .width('100%')

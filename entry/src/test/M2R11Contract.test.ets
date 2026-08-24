@@ -165,6 +165,7 @@ class PageDecoder implements ProductDecodePort {
   pageTwoCount: number = 25;
   failPageTwoOnce: boolean = false;
   threadedOrder: boolean = false;
+  canonicalTopicId: number = 0;
 
   async decodeHome(_html: string, _inputBytes: number): Promise<HomeProductDecodeResult> {
     const document: HomeProtocolDocument = { protocolMatched: true, bbsVersion: 'v8.6.5', topics: [], warnings: [] };
@@ -198,6 +199,7 @@ class PageDecoder implements ProductDecodePort {
     }
     const document = html === 'page-2' ? protocolDocument(this.pageTwoTotal, 2, this.pageTwoCount, 51, '') :
       protocolDocument(75, 1, 50, 1, 'https://linux.sb/topic/15365?p=2');
+    document.canonicalTopicId = this.canonicalTopicId;
     return { execution: 'TASKPOOL', executionWarning: '', parseMs: 2, inputBytes: 1024, document: document };
   }
 }
@@ -221,6 +223,14 @@ export default function m2r11ContractTest() {
       const result = new TopicProbeDecoder().decode(pageFixture(35, 1, 35, 1, true), 15365);
       expect(result.replies.length).assertEqual(35);
       expect(result.warnings.indexOf('REPLY_STRUCTURE_MISMATCH')).assertEqual(-1);
+    });
+
+    it('rejects a decoded response whose canonical topic differs from the request', 0, async () => {
+      const decoder = new PageDecoder();
+      decoder.canonicalTopicId = 15840;
+      const result = await new TopicRepository(new PageTransport(), decoder, new AnonymousSession()).loadTopic(15365);
+      expect(result.ok).assertFalse();
+      expect(result.failure?.message).assertEqual('TOPIC_IDENTITY_MISMATCH');
     });
 
     it('recognizes seventy-five replies as a fifty plus twenty-five page contract', 0, () => {
@@ -464,10 +474,10 @@ export default function m2r11ContractTest() {
       const repository = new TopicRepository(transport, new PageDecoder(), new AnonymousSession());
       const viewModel = new TopicDetailViewModel(repository);
       await viewModel.open(15365, undefined);
-      for (let batch = 0; batch < 4; batch++) {
+      for (let batch = 0; batch < 3; batch++) {
         await viewModel.onReplyListReachEnd();
       }
-      expect(viewModel.visibleReplies().length).assertEqual(50);
+      expect(viewModel.visibleReplies().length).assertEqual(40);
       expect(transport.nextPageCalls).assertEqual(0);
       await viewModel.onReplyListReachEnd();
       expect(transport.nextPageCalls).assertEqual(1);

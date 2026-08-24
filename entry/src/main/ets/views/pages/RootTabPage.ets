@@ -1,4 +1,11 @@
 import { bundleManager } from '@kit.AbilityKit';
+import {
+  buildTopicRouteParam,
+  DIAGNOSTICS_ROUTE,
+  isTopicRouteParam,
+  TOPIC_ROUTE,
+  TopicRouteParam
+} from '../../app/AppRoutes';
 import { m1Runtime } from '../../app/M1Runtime';
 import { SemanticColors } from '../../common/theme/DesignSystem';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
@@ -7,9 +14,6 @@ import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { HomePage } from './HomePage';
 import { P0ProbePage } from './P0ProbePage';
 import { TopicDetailPage } from './TopicDetailPage';
-
-const TOPIC_ROUTE: string = 'TopicDetail';
-const DIAGNOSTICS_ROUTE: string = 'P0Diagnostics';
 
 function isDebugPackage(): boolean {
   try {
@@ -24,10 +28,11 @@ function isDebugPackage(): boolean {
 @Component
 export struct RootTabPage {
   @Provide('appPathStack') private pathStack: NavPathStack = new NavPathStack();
-  @State private selectedTopic: TopicUiModel = new TopicUiModel();
   @State private showOfficialLogin: boolean = false;
   @State private loginReturnsToTopic: boolean = false;
   @State private authenticated: boolean = false;
+  @State private loginReturnTopicId: number = 0;
+  @State private ignoreTopicTapUntil: number = 0;
   private debugPackage: boolean = isDebugPackage();
 
   aboutToAppear(): void {
@@ -36,9 +41,11 @@ export struct RootTabPage {
   }
 
   private openTopic(topic: TopicUiModel): void {
+    if (Date.now() < this.ignoreTopicTapUntil) {
+      return;
+    }
     TopicOpenTrace.begin(topic.topicId);
-    this.selectedTopic = topic;
-    this.pathStack.pushPathByName(TOPIC_ROUTE, null);
+    this.pathStack.pushPath(new NavPathInfo(TOPIC_ROUTE, buildTopicRouteParam(topic.topicId, topic)));
     TopicOpenTrace.markRoutePush();
   }
 
@@ -69,31 +76,54 @@ export struct RootTabPage {
     this.showOfficialLogin = true;
   }
 
-  private requestTopicLogin(): void {
+  private requestTopicLogin(routeParam: TopicRouteParam): void {
     this.loginReturnsToTopic = true;
+    this.loginReturnTopicId = routeParam.topicId;
     this.showOfficialLogin = true;
   }
 
+  private currentTopicRoute(): TopicRouteParam | undefined {
+    const names = this.pathStack.getAllPathName();
+    const topIndex = names.length - 1;
+    if (topIndex < 0 || names[topIndex] !== TOPIC_ROUTE) {
+      return undefined;
+    }
+    const param = this.pathStack.getParamByIndex(topIndex) as Object | undefined;
+    return isTopicRouteParam(param) ? param as TopicRouteParam : undefined;
+  }
+
   private finishOfficialLogin(): void {
+    const returnsToTopic = this.loginReturnsToTopic;
+    const returnTopicId = this.loginReturnTopicId;
+    const currentRoute = this.currentTopicRoute();
     this.showOfficialLogin = false;
-    if (this.loginReturnsToTopic) {
-      m1Runtime.topicViewModel.onOfficialLoginCompleted();
+    if (returnsToTopic && returnTopicId > 0) {
+      const returnSummary = currentRoute !== undefined && currentRoute.topicId === returnTopicId ?
+        currentRoute.summary : m1Runtime.topicViewModel.summary;
+      const restoredRoute = buildTopicRouteParam(returnTopicId, returnSummary);
+      this.ignoreTopicTapUntil = Date.now() + 700;
+      m1Runtime.topicViewModel.onOfficialLoginCompleted(returnTopicId, restoredRoute.summary);
+      if (currentRoute === undefined || currentRoute.topicId !== returnTopicId) {
+        this.pathStack.pushPath(new NavPathInfo(TOPIC_ROUTE, restoredRoute));
+      }
     } else {
       m1Runtime.captureOfficialLogin();
     }
     this.authenticated = m1Runtime.hasMemorySession();
+    this.loginReturnsToTopic = false;
+    this.loginReturnTopicId = 0;
   }
 
   @Builder
-  private pathMap(routeName: string) {
-    if (routeName === TOPIC_ROUTE) {
+  private pathMap(routeName: string, param: Object | undefined) {
+    if (routeName === TOPIC_ROUTE && isTopicRouteParam(param)) {
       NavDestination() {
         TopicDetailPage({
           viewModel: m1Runtime.topicViewModel,
-          topicId: this.selectedTopic.topicId,
-          summary: this.selectedTopic,
+          topicId: (param as TopicRouteParam).topicId,
+          summary: (param as TopicRouteParam).summary,
           onBack: () => this.pathStack.pop(),
-          onLogin: () => this.requestTopicLogin()
+          onLogin: () => this.requestTopicLogin(param as TopicRouteParam)
         })
       }
       .hideTitleBar(true)

@@ -140,6 +140,7 @@ export struct TopicDetailPage {
         ListItem() {
           LoginRequiredCard({
             replyCount: detail.advertisedReplyCount,
+            errorMessage: this.viewModel.loginError,
             onLogin: () => this.onLogin()
           })
             .margin({ left: 10, right: 10, top: 12, bottom: 12 })
@@ -161,6 +162,7 @@ export struct TopicDetailPage {
           }
         }, (reply: ReplyUiModel) => reply.postId.toString())
         ListItem() { this.loadMoreState(detail) }
+          .onAppear(() => this.viewModel.onReplyListReachEnd())
       }
       ListItem() {
         Row().width('100%').height(PageMetrics.REPLY_BAR_HEIGHT + this.bottomInset + 16)
@@ -175,6 +177,7 @@ export struct TopicDetailPage {
       this.summaryVisible = start <= 1;
       this.viewModel.onReplyListViewport(end);
     })
+    .onReachEnd(() => this.viewModel.onReplyListReachEnd())
     .onAppear(() => TopicOpenTrace.markFirstContentFrame())
   }
 

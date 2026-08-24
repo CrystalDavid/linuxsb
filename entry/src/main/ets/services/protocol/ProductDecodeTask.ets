@@ -82,6 +82,7 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
     inputBytes: inputBytes,
     topic: {
       protocolMatched: topic.protocolMatched,
+      canonicalTopicId: topic.canonicalTopicId,
       bbsVersion: structure.detectedBbsVersion,
       title: topic.title,
       viewCount: topic.viewCount,

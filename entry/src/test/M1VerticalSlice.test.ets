@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@ohos/hypium';
+import { buildTopicRouteParam, isTopicRouteParam } from '../main/ets/app/AppRoutes';
 import { ContentBlockKind, paragraphBlock } from '../main/ets/models/ContentBlock';
 import { HomeFeed } from '../main/ets/models/HomeModels';
+import { TopicUiModel } from '../main/ets/models/presentation/ForumUiModels';
 import { ReplyAccess, TopicDetail } from '../main/ets/models/TopicModels';
 import { AuthSessionPort } from '../main/ets/services/auth/AuthSession';
 import {
@@ -243,6 +245,22 @@ class SequenceTopicDataSource implements TopicDataSourcePort {
 
 export default function m1VerticalSliceTest() {
   describe('M1 read-only vertical slice', () => {
+    it('freezes topic identity and summary in navigation route params', 0, () => {
+      const topic = new TopicUiModel();
+      topic.topicId = 15365;
+      topic.title = 'Frozen route topic';
+      topic.author.displayName = 'fictional-author';
+      const route = buildTopicRouteParam(topic.topicId, topic);
+      topic.topicId = 15808;
+      topic.title = 'Mutated source topic';
+      topic.author.displayName = 'mutated-author';
+      expect(isTopicRouteParam(route)).assertTrue();
+      expect(route.topicId).assertEqual(15365);
+      expect(route.summary.topicId).assertEqual(15365);
+      expect(route.summary.title).assertEqual('Frozen route topic');
+      expect(route.summary.author.displayName).assertEqual('fictional-author');
+    });
+
     it('maps a successful HomeRepository response to TopicSummary', 0, async () => {
       const transport = new FakeForumTransport();
       const decoder = new FakeProductDecoder();
@@ -321,6 +339,48 @@ export default function m1VerticalSliceTest() {
       expect(source.requestedTopicIds[0]).assertEqual(605);
       expect(source.requestedTopicIds[1]).assertEqual(605);
       expect(viewModel.detail?.replies.length).assertEqual(1);
+    });
+
+    it('restores the frozen topic id when login closes after shared state changed', 0, async () => {
+      const first = mappedTopic(false);
+      first.topicId = 15808;
+      const restored = mappedTopic(false);
+      restored.topicId = 15365;
+      const source = new SequenceTopicDataSource([
+        { ok: true, data: first, diagnostics: emptyDiagnostics() },
+        { ok: true, data: restored, diagnostics: emptyDiagnostics() }
+      ]);
+      const viewModel = new TopicDetailViewModel(source);
+      await viewModel.load(15808);
+      await viewModel.onOfficialLoginCompleted(15365);
+      expect(source.requestedTopicIds.length).assertEqual(2);
+      expect(source.requestedTopicIds[1]).assertEqual(15365);
+      expect(viewModel.topicId).assertEqual(15365);
+      expect(viewModel.detail?.topicId).assertEqual(15365);
+    });
+
+    it('retries one identity mismatch after login without applying the wrong topic', 0, async () => {
+      const anonymous = mappedTopic(true);
+      anonymous.topicId = 15365;
+      const authenticated = mappedTopic(false);
+      authenticated.topicId = 15365;
+      const source = new SequenceTopicDataSource([
+        { ok: true, data: anonymous, diagnostics: emptyDiagnostics() },
+        {
+          ok: false,
+          failure: { kind: RepositoryFailureKind.Protocol, message: 'TOPIC_IDENTITY_MISMATCH' },
+          diagnostics: emptyDiagnostics()
+        },
+        { ok: true, data: authenticated, diagnostics: emptyDiagnostics() }
+      ]);
+      const viewModel = new TopicDetailViewModel(source);
+      await viewModel.load(15365);
+      await viewModel.onOfficialLoginCompleted(15365);
+      expect(source.requestedTopicIds.length).assertEqual(3);
+      expect(source.requestedTopicIds[1]).assertEqual(15365);
+      expect(source.requestedTopicIds[2]).assertEqual(15365);
+      expect(viewModel.detail?.topicId).assertEqual(15365);
+      expect(viewModel.detail?.replyAccess).assertEqual(ReplyAccess.Visible);
     });
 
     it('downgrades an unknown content extension without crashing', 0, () => {

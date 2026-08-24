@@ -93,5 +93,16 @@ export default function probeDecoderTest() {
       expect(result.warnings.indexOf('TOPIC_TITLE_MISSING') >= 0).assertTrue();
       expect(result.warnings.indexOf('TOPIC_ID_MISMATCH:56:55') >= 0).assertTrue();
     });
+
+    it('rejects a different canonical topic even when the first post id matches the request', 0, () => {
+      const fixture = '<link rel="canonical" href="https://linux.sb/topic/15840">' +
+        '<h1 class="post-content-title">wrong response</h1>' +
+        '<div class="post-content-stats"><span>1</span><span>0</span></div>' +
+        '<li class="post-entry" id="post-15365"></li>';
+      const result = new TopicProbeDecoder().decode(fixture, 15365);
+      expect(result.canonicalTopicId).assertEqual(15840);
+      expect(result.protocolMatched).assertFalse();
+      expect(result.warnings.indexOf('TOPIC_ID_MISMATCH:15365:15840') >= 0).assertTrue();
+    });
   });
 }

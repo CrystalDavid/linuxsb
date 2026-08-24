@@ -61,8 +61,11 @@ export class TopicDetailViewModel {
   }
 
   private async refreshFromSource(topicId: number, forceRefresh: boolean, generation: number,
-    preserveContentOnError: boolean): Promise<void> {
-    const result = await this.dataSource.loadTopic(topicId, forceRefresh);
+    preserveContentOnError: boolean, retryIdentityMismatch: boolean = false): Promise<void> {
+    let result = await this.dataSource.loadTopic(topicId, forceRefresh);
+    if (retryIdentityMismatch && !result.ok && result.failure?.message === 'TOPIC_IDENTITY_MISMATCH') {
+      result = await this.dataSource.loadTopic(topicId, true);
+    }
     if (generation !== this.generation || topicId !== this.topicId) {
       return;
     }
@@ -111,7 +114,9 @@ export class TopicDetailViewModel {
     }
     if (this.mountedReplyCount < detail.replies.length) {
       this.mountedReplyCount = Math.min(detail.replies.length, this.mountedReplyCount + 10);
-      return;
+      if (this.mountedReplyCount < detail.replies.length || detail.nextPageUrl.length === 0) {
+        return;
+      }
     }
     if (detail.nextPageUrl.length === 0 || this.loadingMore || this.dataSource.loadNextReplyPage === undefined) {
       return;
@@ -143,17 +148,30 @@ export class TopicDetailViewModel {
     }
   }
 
-  async onOfficialLoginCompleted(): Promise<void> {
+  async onOfficialLoginCompleted(expectedTopicId: number = 0,
+    expectedSummary: TopicUiModel | undefined = undefined): Promise<void> {
     this.loginError = '';
     if (!this.dataSource.captureOfficialLogin()) {
       this.loginError = '登录 Cookie 尚未就绪，请重新完成官方登录。';
       return;
     }
-    if (this.topicId > 0) {
+    const returnTopicId = expectedTopicId > 0 ? expectedTopicId : this.topicId;
+    if (returnTopicId > 0) {
+      const preserveContent = this.topicId === returnTopicId && this.presentationDetail?.topicId === returnTopicId;
+      this.topicId = returnTopicId;
+      if (expectedSummary !== undefined && expectedSummary.topicId === returnTopicId) {
+        this.summary = expectedSummary;
+      }
+      if (!preserveContent) {
+        this.detail = undefined;
+        this.presentationDetail = undefined;
+        this.mountedReplyCount = 10;
+        this.loadingMore = false;
+        this.loadMoreError = '';
+      }
       const generation = ++this.generation;
-      const preserveContent = this.presentationDetail !== undefined;
       this.state = preserveContent ? ViewLoadState.Content : ViewLoadState.Loading;
-      await this.refreshFromSource(this.topicId, true, generation, preserveContent);
+      await this.refreshFromSource(returnTopicId, true, generation, preserveContent, true);
     }
   }
 }

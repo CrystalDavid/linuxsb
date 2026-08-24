@@ -1,6 +1,6 @@
 import { HtmlToken, HtmlTokenType, LightweightHtmlTokenizer } from './LightweightHtmlTokenizer';
 import { ReplyProbeSummary, TopicProbeResult } from './ProbeModels';
-import { collapseWhitespace, hasClass, parseFirstUnsigned, parsePrefixedId } from './HtmlProbeUtils';
+import { collapseWhitespace, hasClass, parseFirstUnsigned, parsePrefixedId, parseRouteId } from './HtmlProbeUtils';
 
 class PostDraft {
   postId: number = 0;
@@ -41,9 +41,13 @@ export class TopicProbeDecoder {
     let currentPage = 1;
     let totalPages = 1;
     let nextPageUrl = '';
+    let canonicalTopicId = 0;
 
     new LightweightHtmlTokenizer().scan(html, (token: HtmlToken) => {
       if (token.type === HtmlTokenType.START_TAG) {
+        if (token.name === 'link' && (token.attributes.get('rel') ?? '').toLowerCase() === 'canonical') {
+          canonicalTopicId = parseRouteId(token.attributes.get('href') ?? '', '/topic/');
+        }
         if (paginationDepth > 0 && !token.selfClosing && !this.isVoidTag(token.name)) {
           paginationDepth++;
         } else if (token.name === 'div' && hasClass(token.attributes, 'pagination')) {
@@ -223,8 +227,9 @@ export class TopicProbeDecoder {
     if (mainPostId <= 0) {
       warnings.push('MAIN_POST_ID_MISSING');
     }
-    if (expectedTopicId > 0 && mainPostId > 0 && expectedTopicId !== mainPostId) {
-      warnings.push(`TOPIC_ID_MISMATCH:${expectedTopicId}:${mainPostId}`);
+    const responseTopicId = canonicalTopicId > 0 ? canonicalTopicId : mainPostId;
+    if (expectedTopicId > 0 && responseTopicId > 0 && expectedTopicId !== responseTopicId) {
+      warnings.push(`TOPIC_ID_MISMATCH:${expectedTopicId}:${responseTopicId}`);
     }
     if (advertisedReplyCount > replies.length) {
       if (replies.length === 0 && loginVisibleMarkerCount > 0) {
@@ -243,7 +248,9 @@ export class TopicProbeDecoder {
       warnings.push(`REPLY_COUNT_MISMATCH:${advertisedReplyCount}:${replies.length}`);
     }
     return {
-      protocolMatched: title.length > 0 && mainPostId > 0 && (expectedTopicId <= 0 || expectedTopicId === mainPostId),
+      protocolMatched: title.length > 0 && mainPostId > 0 &&
+        (expectedTopicId <= 0 || expectedTopicId === responseTopicId),
+      canonicalTopicId: canonicalTopicId,
       title: title,
       viewCount: viewCount,
       advertisedReplyCount: advertisedReplyCount,

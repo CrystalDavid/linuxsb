@@ -39,6 +39,7 @@ export interface ReplyProbeSummary {
 
 export interface TopicProbeResult {
   protocolMatched: boolean;
+  canonicalTopicId: number;
   title: string;
   viewCount: number;
   advertisedReplyCount: number;

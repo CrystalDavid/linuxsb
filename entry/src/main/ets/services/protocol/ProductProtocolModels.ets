@@ -63,6 +63,7 @@ export interface TopicProtocolReply {
 
 export interface TopicProtocolDocument {
   protocolMatched: boolean;
+  canonicalTopicId?: number;
   bbsVersion: string;
   title: string;
   viewCount: number;
