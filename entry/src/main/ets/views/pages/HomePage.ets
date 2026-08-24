@@ -36,8 +36,8 @@ export struct HomePage {
   @State private drawerMounted: boolean = false;
   @State private drawerProgress: number = 0;
   @State private drawerOpen: boolean = false;
-  @State private draftSort: HomeFeedSort = HomeFeedSort.Latest;
-  @State private appliedSort: HomeFeedSort = HomeFeedSort.Latest;
+  @State private draftSort: HomeFeedSort = HomeFeedSort.NewComments;
+  @State private appliedSort: HomeFeedSort = HomeFeedSort.NewComments;
   @State private draftCategoryId: number = 0;
   @State private appliedCategoryId: number = 0;
   @State private categories: CategoryUiModel[] = [];
@@ -47,6 +47,7 @@ export struct HomePage {
   private touchDownX: number = -1;
   private listScroller: Scroller = new Scroller();
   private topicDataSource: TopicListDataSource = new TopicListDataSource();
+  private lastPrefetchKey: string = '';
 
   aboutToAppear(): void {
     this.syncPresentation();
@@ -56,6 +57,7 @@ export struct HomePage {
   }
 
   aboutToDisappear(): void {
+    this.lastPrefetchKey = '';
     this.onCancelPrefetch();
   }
 
@@ -95,8 +97,6 @@ export struct HomePage {
       topics.sort((left: TopicUiModel, right: TopicUiModel) => right.lastReplyAt - left.lastReplyAt);
     } else if (this.appliedSort === HomeFeedSort.NewTopics) {
       topics.sort((left: TopicUiModel, right: TopicUiModel) => right.topicId - left.topicId);
-    } else if (this.appliedSort === HomeFeedSort.Featured) {
-      topics = topics.filter((topic: TopicUiModel) => topic.isFeatured);
     }
     this.visibleTopics = topics;
     this.topicDataSource.replace(topics);
@@ -108,11 +108,12 @@ export struct HomePage {
     for (let index = Math.max(0, firstVisible); index < this.visibleTopics.length && ids.length < 3; index++) {
       ids.push(this.visibleTopics[index].topicId);
     }
+    const key = ids.join(',');
+    if (key === this.lastPrefetchKey) {
+      return;
+    }
+    this.lastPrefetchKey = key;
     this.onPrefetch(ids);
-  }
-
-  private hasFeatured(): boolean {
-    return this.viewModel.presentationTopics.some((topic: TopicUiModel) => topic.isFeatured);
   }
 
   private openDrawer(): void {
@@ -176,7 +177,7 @@ export struct HomePage {
       }
     }
     .id('home-menu')
-    .accessibilityText('打开筛选抽屉')
+    .accessibilityText('打开主题选项')
     .width(42).height(42).backgroundColor(Color.Transparent)
     .onClick(() => this.openDrawer())
   }
@@ -397,7 +398,6 @@ export struct HomePage {
             selectedCategoryId: this.draftCategoryId,
             appliedSort: this.appliedSort,
             appliedCategoryId: this.appliedCategoryId,
-            showFeatured: this.hasFeatured(),
             onSortChange: (sort: HomeFeedSort) => { this.draftSort = sort; },
             onCategoryChange: (categoryId: number) => { this.draftCategoryId = categoryId; },
             onApply: () => this.applyDrawer(),

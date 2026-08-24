@@ -372,6 +372,31 @@ export default function m2r1ContractTest() {
       expect(viewModel.state).assertEqual(ViewLoadState.Content);
     });
 
+    it('clears the previous topic before a different uncached topic starts loading', 0, async () => {
+      const source = new SingleTopicSource();
+      const viewModel = new TopicDetailViewModel(source);
+      await viewModel.open(605, undefined);
+      expect(viewModel.presentationDetail?.topicId).assertEqual(605);
+      source.result = { ok: true, data: detail(606, 'Second topic'), diagnostics: emptyDiagnostics() };
+      const pending = viewModel.open(606, undefined);
+      expect(viewModel.state).assertEqual(ViewLoadState.Loading);
+      expect(viewModel.presentationDetail === undefined).assertTrue();
+      await pending;
+      expect(viewModel.presentationDetail?.topicId).assertEqual(606);
+    });
+
+    it('keeps the same topic visible while its permission-aware state refreshes', 0, async () => {
+      const source = new SingleTopicSource();
+      const viewModel = new TopicDetailViewModel(source);
+      await viewModel.open(605, undefined);
+      source.result = { ok: true, data: detail(605, 'Refreshed topic'), diagnostics: emptyDiagnostics() };
+      const pending = viewModel.open(605, undefined);
+      expect(viewModel.state).assertEqual(ViewLoadState.Content);
+      expect(viewModel.presentationDetail?.title).assertEqual('Fixture topic');
+      await pending;
+      expect(viewModel.presentationDetail?.title).assertEqual('Refreshed topic');
+    });
+
     it('renders a warm cache synchronously and revalidates in the background', 0, async () => {
       const source = new SingleTopicSource();
       source.cached = detail(605, 'Cached');
@@ -407,6 +432,19 @@ export default function m2r1ContractTest() {
       await Promise.resolve();
       await Promise.resolve();
       expect(source.calls.length).assertEqual(2);
+    });
+
+    it('does not reschedule the same visible prefetch window on every scroll callback', 0, async () => {
+      const source = new BlockingPrefetchSource();
+      const coordinator = new TopicPrefetchCoordinator(source, 0);
+      coordinator.schedule([1, 2, 3]);
+      coordinator.schedule([1, 2, 3]);
+      expect(source.calls.length).assertEqual(2);
+      source.releaseAll();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(source.calls.length).assertEqual(3);
+      source.releaseAll();
     });
   });
 }

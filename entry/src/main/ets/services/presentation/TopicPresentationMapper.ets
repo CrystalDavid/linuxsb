@@ -51,8 +51,17 @@ export class TopicPresentationMapper {
     output.loadedReplyCount = replyPage?.loadedReplyCount ?? replies.length;
     output.totalPages = replyPage?.totalPages ?? 1;
     output.nextPageUrl = replyPage?.nextPageUrl ?? '';
+    const depthByFloor = new Map<number, number>();
     for (let index = 0; index < replies.length; index++) {
-      output.replies.push(this.mapReply(replies[index]));
+      const reply = this.mapReply(replies[index]);
+      if (reply.parentFloor > 0) {
+        const parentDepth = depthByFloor.get(reply.parentFloor) ?? 0;
+        reply.threadDepth = Math.min(2, parentDepth + 1);
+      }
+      if (reply.floor > 0) {
+        depthByFloor.set(reply.floor, reply.threadDepth);
+      }
+      output.replies.push(reply);
     }
     return output;
   }

@@ -133,9 +133,13 @@
 - M2-R1.1 分支、安全 checkpoint、签名隔离和 artifacts 忽略：PASS。
 - Topic 15365 分页协议修复：PASS；登录态结构探针确认真实下一页 href，第一页 50 条为合法引用树顺序，实时声明总数本次为 87，`REPLY_STRUCTURE_MISMATCH` 已消除。
 - 正文边界、引用父楼层、分页去重/幂等、批量挂载与可点击加载兜底：PASS；固定 75 = 50 + 25 fixture 与动态总数测试均通过。
-- 正式首页“非官方客户端”副标题移除：PASS；最新版 Pura 90 dumpLayout 为该文字 0、Home Web 0。
-- 自动测试与构建：PASS；`hvigor test` 65/65、`onDeviceTest` 5/5、`NoWebOutsideLogin`、signed HAP 构建、覆盖安装和启动均通过。
-- 最新版登录后第二页 UI 合并复验：NOT RUN；覆盖安装后内存登录会话已按设计清空，等待重新完成官方登录。
-- DevEco ArkUI Inspector：NOT RUN；Windows 桌面仍处于锁定状态，不得用 dumpLayout 冒充 Inspector 结果。
+- 正文原生展示修复：PASS；网页折叠控件不进入正文，真实用户正文中的“展开全文”仍保留；懒加载、链接包裹和 `srcset` 图片进入原生 Image，图片异步加载且不阻塞文字。
+- 楼中楼原生表现：PASS（自动契约）；父楼层映射为有界 `threadDepth`，保持服务端引用树顺序并显示“楼中楼 · 回复 #N”。登录后真实 Topic 15365 最终 UI 仍随第二页复验一起验收。
+- 抽屉与品牌修复：PASS；主色由青色改为蓝色，删除“筛选”“版块”“最新”，仅保留“新评论 / 新帖子”；正式首页“非官方客户端”副标题保持删除。最新版 Pura 90 dumpLayout 为这些禁用文字 0、Home/Drawer Web 0。
+- 性能修复：PASS（自动契约）；修复不同主题复用 ViewModel 时的旧内容串页，同主题刷新保留现有内容；重复可见窗口预取被抑制，返回首页后可重新调度，缓存、在途请求去重、十条批量挂载和图片非阻塞继续生效。历史冷网络 1500 ms 指标仍按真实网络阶段单独记录，不伪装为解码耗时。
+- 自动测试与构建：PASS；`hvigor test` 71/71、`onDeviceTest` 5/5、`NoWebOutsideLogin`、signed HAP 构建、模拟器覆盖安装和启动均通过。
+- 模拟器进程与安全日志：PASS；最终 Home/Drawer dumpLayout Web 0，5 秒应用日志 7117 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、POST 证据 0，生产源码 POST 命中 0。
+- 最新版登录后第二页 UI 合并复验：NOT RUN；最终覆盖安装后内存登录会话已按设计清空，等待用户重新完成官方登录。
+- DevEco ArkUI Inspector：PASS；已真实连接 `com.example.shaobingcommunity`，展开 `RootPage -> RootTabPage -> Navigation`，并在普通页面组件搜索中确认 `Web` 无匹配子节点。
 - 最终 API 26 真机复验：NOT RUN；M2-R1 总状态继续保持 FAIL，不创建 PASS 标签。
 - P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。

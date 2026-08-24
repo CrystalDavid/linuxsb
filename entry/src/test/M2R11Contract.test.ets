@@ -1,8 +1,9 @@
 import { describe, expect, it } from '@ohos/hypium';
 import { ContentBlockKind } from '../main/ets/models/ContentBlock';
-import { ReplyAccess } from '../main/ets/models/TopicModels';
+import { ReplyAccess, TopicDetail } from '../main/ets/models/TopicModels';
 import { AuthSessionPort } from '../main/ets/services/auth/AuthSession';
 import { TopicMemoryCache } from '../main/ets/services/cache/TopicMemoryCache';
+import { TopicPresentationMapper } from '../main/ets/services/presentation/TopicPresentationMapper';
 import {
   resolveTopicDetailHeaderMode,
   TopicDetailHeaderMode
@@ -280,6 +281,53 @@ export default function m2r11ContractTest() {
       const fixture = '<li class="post-entry" id="post-605"><div class="post-content">' +
         '<div class="long-content-fold-content"><p>用户正文真的写了展开全文</p></div></div></li>';
       expect(new TopicContentDecoder().decode(fixture)[0].blocks[0].text).assertEqual('用户正文真的写了展开全文');
+    });
+
+    it('excludes attribute-marked expand controls while keeping the complete native body', 0, () => {
+      const fixture = '<li class="post-entry" id="post-605"><div class="post-content">' +
+        '<div class="long-content-fold-content"><p>第一段</p><p>第二段</p></div>' +
+        '<div data-long-content-fold-actions><button data-long-content-fold-toggle>' +
+        '<span data-long-content-fold-label>展开全文</span></button></div></div></li>';
+      const blocks = new TopicContentDecoder().decode(fixture)[0].blocks;
+      expect(blocks.length).assertEqual(2);
+      expect(blocks[0].text).assertEqual('第一段');
+      expect(blocks[1].text).assertEqual('第二段');
+    });
+
+    it('decodes lazy and link-wrapped images without emitting an empty link', 0, () => {
+      const fixture = '<li class="post-entry" id="post-605"><div class="post-content">' +
+        '<p><img data-src="/media/lazy.png" alt="lazy image"></p>' +
+        '<p><a href="/media/full.png"><img srcset="/media/small.png 1x, /media/full.png 2x" alt="linked"></a></p>' +
+        '</div></li>';
+      const blocks = new TopicContentDecoder().decode(fixture)[0].blocks;
+      expect(blocks.length).assertEqual(2);
+      expect(blocks[0].kind).assertEqual(ContentBlockKind.Image);
+      expect(blocks[0].url).assertEqual('https://linux.sb/media/lazy.png');
+      expect(blocks[1].kind).assertEqual(ContentBlockKind.Image);
+      expect(blocks[1].url).assertEqual('https://linux.sb/media/small.png');
+    });
+
+    it('maps quote-thread parents into a bounded native reply depth', 0, () => {
+      const detail: TopicDetail = {
+        topicId: 605,
+        title: 'Thread fixture',
+        viewCount: 10,
+        advertisedReplyCount: 4,
+        mainPost: { postId: 605, author: { displayName: 'owner' }, content: [] },
+        replies: [
+          { replyId: 1, floor: 1, author: { displayName: 'a' }, content: [] },
+          { replyId: 2, floor: 2, parentFloor: 1, author: { displayName: 'b' }, content: [] },
+          { replyId: 3, floor: 3, parentFloor: 2, author: { displayName: 'c' }, content: [] },
+          { replyId: 4, floor: 4, parentFloor: 3, author: { displayName: 'd' }, content: [] }
+        ],
+        replyAccess: ReplyAccess.Visible,
+        protocolVersion: 'v8.6.5'
+      };
+      const mapped = new TopicPresentationMapper().mapDetail(detail);
+      expect(mapped.replies[0].threadDepth).assertEqual(0);
+      expect(mapped.replies[1].threadDepth).assertEqual(1);
+      expect(mapped.replies[2].threadDepth).assertEqual(2);
+      expect(mapped.replies[3].threadDepth).assertEqual(2);
     });
 
     it('separates edited metadata from the post body', 0, () => {

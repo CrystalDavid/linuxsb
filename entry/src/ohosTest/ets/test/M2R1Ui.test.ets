@@ -40,6 +40,11 @@ async function hasId(id: string): Promise<boolean> {
   return components !== null && components !== undefined && components.length > 0;
 }
 
+async function hasText(text: string): Promise<boolean> {
+  const components = await driver.findComponents(ON.text(text));
+  return components !== null && components !== undefined && components.length > 0;
+}
+
 async function returnToHome(): Promise<void> {
   await abilityDelegatorRegistry.getAbilityDelegator().startAbility(productWant());
   await driver.delayMs(SETTLE_MS);
@@ -82,6 +87,11 @@ export default function m2r1UiTest() {
       expect(headerHeightVp >= 50 && headerHeightVp <= 58).assertTrue();
       expect(headerToFiltersVp >= 0 && headerToFiltersVp <= 16).assertTrue();
       expect(Math.abs(rowHeightVp - 48) <= 1).assertTrue();
+      await componentById('choice-新评论');
+      await componentById('choice-新帖子');
+      expect(await hasId('choice-最新')).assertFalse();
+      expect(await hasText('筛选')).assertFalse();
+      expect(await hasText('版块')).assertFalse();
       await componentById('category-drawer-confirm-bar');
       await (await componentById('category-drawer-close')).click();
       await driver.delayMs(SETTLE_MS);

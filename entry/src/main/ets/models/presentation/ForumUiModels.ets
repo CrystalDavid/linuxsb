@@ -32,6 +32,7 @@ export class PostUiModel {
   postId: number = 0;
   floor: number = 0;
   parentFloor: number = 0;
+  threadDepth: number = 0;
   author: UserUiModel = new UserUiModel();
   postedAtLabel: string = '';
   content: ContentBlock[] = [];

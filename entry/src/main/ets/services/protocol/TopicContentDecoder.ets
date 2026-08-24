@@ -7,7 +7,7 @@ import {
   ProtocolRewardExtension
 } from './ProductProtocolModels';
 
-const MAX_BLOCKS_PER_POST = 64;
+const MAX_BLOCKS_PER_POST = 256;
 const MAX_TEXT_PER_BLOCK = 8192;
 
 class PostContentDraft {
@@ -52,6 +52,7 @@ export class TopicContentDecoder {
     let captureRootDepth = 0;
     let captureText = '';
     let captureUrl = '';
+    let captureHasEmbeddedImage = false;
 
     const flushPendingText = (): void => {
       if (currentPost === undefined) {
@@ -75,7 +76,7 @@ export class TopicContentDecoder {
         return;
       }
       const value = captureKind === 'CodeBlock' ? captureText.trim() : collapseWhitespace(captureText);
-      if (value.length > 0 || captureKind === 'Link') {
+      if (value.length > 0 || (captureKind === 'Link' && captureUrl.length > 0 && !captureHasEmbeddedImage)) {
         this.addBlock(currentPost, captureKind, value, captureUrl, '');
       }
       captureKind = '';
@@ -83,6 +84,7 @@ export class TopicContentDecoder {
       captureRootDepth = 0;
       captureText = '';
       captureUrl = '';
+      captureHasEmbeddedImage = false;
     };
 
     const finishEditedMetadata = (): void => {
@@ -212,7 +214,14 @@ export class TopicContentDecoder {
           return;
         }
         if (captureKind.length > 0) {
-          if (token.name === 'br') {
+          if (token.name === 'img') {
+            const source = this.imageSource(token.attributes);
+            const description = collapseWhitespace(token.attributes.get('alt') ?? '');
+            if (source.length > 0) {
+              this.addBlock(currentPost, 'Image', '', source, description);
+              captureHasEmbeddedImage = true;
+            }
+          } else if (token.name === 'br') {
             captureText += '\n';
           }
           return;
@@ -262,7 +271,7 @@ export class TopicContentDecoder {
           captureText = '';
         } else if (token.name === 'img') {
           flushPendingText();
-          const source = this.normalizeUrl(token.attributes.get('src') ?? '');
+          const source = this.imageSource(token.attributes);
           const description = collapseWhitespace(token.attributes.get('alt') ?? '');
           if (source.length > 0) {
             this.addBlock(currentPost, 'Image', '', source, description);
@@ -414,6 +423,9 @@ export class TopicContentDecoder {
   private isInteractionChrome(token: HtmlToken): boolean {
     return hasClass(token.attributes, 'long-content-fold-actions') ||
       hasClass(token.attributes, 'long-content-fold-toggle') ||
+      token.attributes.has('data-long-content-fold-actions') ||
+      token.attributes.has('data-long-content-fold-toggle') ||
+      token.attributes.has('data-long-content-fold-label') ||
       hasClass(token.attributes, 'quick-reply-main-action') ||
       hasClass(token.attributes, 'post-ops') ||
       hasClass(token.attributes, 'reply-panel') ||
@@ -435,6 +447,24 @@ export class TopicContentDecoder {
       return `https://linux.sb${value}`;
     }
     return value;
+  }
+
+  private imageSource(attributes: Map<string, string>): string {
+    const candidates = ['data-src', 'data-original', 'data-lazy-src', 'data-url', 'src'];
+    for (let index = 0; index < candidates.length; index++) {
+      const value = (attributes.get(candidates[index]) ?? '').trim();
+      if (value.length > 0 && !value.startsWith('data:image/gif;base64,R0lGODlhAQABA')) {
+        return this.normalizeUrl(value);
+      }
+    }
+    const srcset = (attributes.get('srcset') ?? '').trim();
+    if (srcset.length === 0) {
+      return '';
+    }
+    const firstCandidateEnd = srcset.indexOf(',');
+    const firstCandidate = (firstCandidateEnd >= 0 ? srcset.substring(0, firstCandidateEnd) : srcset).trim();
+    const descriptorStart = firstCandidate.indexOf(' ');
+    return this.normalizeUrl((descriptorStart >= 0 ? firstCandidate.substring(0, descriptorStart) : firstCandidate).trim());
   }
 
   private userIdFromUrl(value: string): number {

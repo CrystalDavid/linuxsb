@@ -2,7 +2,7 @@
 
 > 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
 
-> 阶段状态（2026-08-24）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 严格状态仍为 FAIL：模拟器冷正文目标仅 3/5 达标，认证高回复 Topic 15365 出现 `REPLY_STRUCTURE_MISMATCH`，DevEco ArkUI Inspector 为 NOT RUN。当前仅执行 M2-R1.1，对真实分页契约、原生正文边界、授权 ArkDO 抽屉/详情表现和主题打开性能进行修复；未完成全部验收前不得将 M2-R1 改为 PASS 或进入 M2-B。已验证架构继续冻结，真实写操作继续为 NOT RUN。
+> 阶段状态（2026-08-24）：P0、P0-B 与 M1“只读产品纵向闭环”均已在 API 26 真机通过。M2-R1 历史状态严格保持 FAIL。M2-R1.1 已修复 Topic 15365 合法分页契约、正文折叠控件泄漏、图片解码、楼中楼表现、蓝色筛选抽屉和多项可感知性能问题；DevEco ArkUI Inspector、71/71 单元测试、5/5 设备测试及最终模拟器 signed HAP 回归已通过。登录后第二页 UI 与最终 API 26 真机复验仍为 NOT RUN，因此不得将 M2-R1 改为 PASS 或进入 M2-B。已验证架构继续冻结，真实写操作继续为 NOT RUN。
 
 ## 1. 产品定义
 
@@ -160,10 +160,13 @@ M2-R1 的授权 UI、主题打开优化和 API 26 真机核心闭环已经形成
 - 分页仅允许 RCP GET；首屏只取第一页，接近底部再取下一页；按 replyId 去重并维持楼层顺序、重试幂等和返回后已加载页状态。
 - P0-8 仍为 NOT RUN，禁止 POST、发帖、回复、编辑或删除。
 - 当前实现：PASS。Topic 15365 已按真实 `?p=2` href 建模为分页回复页；第一页 50 条采用 BBS1 引用树顺序，`data-quote-threads-parent-floor` 已进入协议、领域和 UI 模型，不再把合法引用树误报为 `REPLY_STRUCTURE_MISMATCH`。网页“展开全文”、引用控制文字、编辑元信息和打赏扩展已与正文分离。
-- 当前 Pura 90 自动回归：PASS。`hvigor test` 为 65/65，`onDeviceTest` 为 5/5，`NoWebOutsideLogin`、signed HAP 构建、覆盖安装和启动均通过；正式首页已移除“非官方客户端”副标题，dumpLayout 为 Home Web 0。
+- 当前 Pura 90 自动回归：PASS。`hvigor test` 为 71/71，`onDeviceTest` 为 5/5，`NoWebOutsideLogin`、signed HAP 构建、覆盖安装和启动均通过；正式首页已移除“非官方客户端”副标题，dumpLayout 为 Home/Drawer Web 0。
 - 当前登录态第一页实测：PASS。Topic 15365 的实时总回复数会变化；本次结构探针得到第一页 50 条、总数 87、1/2 页、真实下一页链接存在，回复 ID 唯一且主楼未重复。
+- 当前 UI 修复：PASS。抽屉使用蓝色语义主色，删除“筛选”“版块”“最新”，只保留“新评论 / 新帖子”；网页“展开全文”控件与正文分离，懒加载/链接包裹图片由原生 Image 异步呈现，楼中楼保留引用树顺序并显示父楼层。
+- 当前性能修复：PASS（自动契约）。不同主题冷开不再短暂显示上一个主题；同主题刷新保留现有内容；可见窗口预取去重并在返回首页后恢复，TopicMemoryCache、InFlight 去重、十条批量挂载和图片非阻塞保持启用。历史冷网络阶段超过 1500 ms 的样本继续单独标记，不误报为解码慢。
+- 当前模拟器安全回归：PASS。最终 5 秒应用日志 7117 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露 0、POST 证据 0；生产源码 POST 命中 0。
 - 当前第二页 UI 懒加载复验：NOT RUN。最新版 HAP 覆盖安装后内存会话按设计清空，等待重新完成官方登录后验证 50 + 当前第二页余量的合并结果。
-- DevEco ArkUI Inspector：NOT RUN。Windows 桌面仍处于锁定状态，不能以 dumpLayout 代替真实 Inspector 操作。
+- DevEco ArkUI Inspector：PASS。已真实连接应用进程，展开 `RootPage -> RootTabPage -> Navigation`，普通页面以 `Web` 搜索后无匹配组件；该证据不以 dumpLayout 替代。
 - 最终 API 26 真机复验：NOT RUN。M2-R1 总状态继续保持 FAIL，不创建 PASS 标签。
 
 ## 3. 协议适配原则

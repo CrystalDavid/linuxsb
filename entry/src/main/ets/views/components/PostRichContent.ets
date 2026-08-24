@@ -3,8 +3,87 @@ import { ContentBlock, ContentBlockKind } from '../../models/ContentBlock';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 
 @Component
+struct PostImageBlock {
+  url: string = '';
+  description: string = '';
+  semanticId: string = 'post-image';
+  @State private loaded: boolean = false;
+  @State private failed: boolean = false;
+
+  build() {
+    if (this.failed) {
+      Row({ space: Spacing.SM }) {
+        Text('图')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(SemanticColors.textSecondary())
+          .width(28)
+          .height(28)
+          .textAlign(TextAlign.Center)
+          .borderRadius(Radius.PILL)
+          .backgroundColor(SemanticColors.skeleton())
+        Column({ space: 3 }) {
+          Text('图片加载失败')
+            .fontSize(Typography.CAPTION)
+            .fontColor(SemanticColors.textSecondary())
+          Text('点击重试')
+            .fontSize(Typography.LABEL_SMALL)
+            .fontColor($r('app.color.brand_primary'))
+        }
+        .alignItems(HorizontalAlign.Start)
+      }
+      .id(`${this.semanticId}-error`)
+      .width('100%')
+      .height(112)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor(SemanticColors.surfaceMuted())
+      .borderRadius(Radius.SM)
+      .onClick(() => {
+        this.loaded = false;
+        this.failed = false;
+      })
+    } else {
+      Stack() {
+        if (!this.loaded) {
+          Column({ space: Spacing.SM }) {
+            LoadingProgress().width(24).height(24).color(SemanticColors.textSecondary())
+            Text('图片加载中')
+              .fontSize(Typography.LABEL_SMALL)
+              .fontColor(SemanticColors.textTertiary())
+          }
+          .width('100%')
+          .height(112)
+          .justifyContent(FlexAlign.Center)
+        }
+        Image(this.url)
+          .id(this.semanticId)
+          .width('100%')
+          .constraintSize({ minHeight: this.loaded ? 1 : 112, maxHeight: PageMetrics.MEDIA_MAX_HEIGHT })
+          .objectFit(ImageFit.Contain)
+          .borderRadius(Radius.SM)
+          .draggable(false)
+          .accessibilityText(this.description.length > 0 ? this.description : '帖子图片')
+          .onAppear(() => TopicOpenTrace.markImageRequestsStart())
+          .onComplete(() => {
+            this.loaded = true;
+            TopicOpenTrace.markFirstImageFrame();
+          })
+          .onError(() => {
+            this.failed = true;
+          })
+      }
+      .width('100%')
+      .constraintSize({ minHeight: this.loaded ? 1 : 112 })
+      .backgroundColor(SemanticColors.surfaceMuted())
+      .borderRadius(Radius.SM)
+    }
+  }
+}
+
+@Component
 export struct PostRichContent {
   blocks: ContentBlock[] = [];
+  semanticPrefix: string = 'post-content';
 
   @Builder
   private blockView(block: ContentBlock) {
@@ -56,11 +135,11 @@ export struct PostRichContent {
       .width('100%').padding(Spacing.MD).backgroundColor(SemanticColors.codeBackground())
       .borderRadius(Radius.SM)
     } else if (block.kind === ContentBlockKind.Image && block.url.length > 0) {
-      Image(block.url).width('100%').constraintSize({ maxHeight: PageMetrics.MEDIA_MAX_HEIGHT })
-        .objectFit(ImageFit.Contain).backgroundColor(SemanticColors.surfaceMuted())
-        .borderRadius(Radius.SM).draggable(false)
-        .onAppear(() => TopicOpenTrace.markImageRequestsStart())
-        .onComplete(() => TopicOpenTrace.markFirstImageFrame())
+      PostImageBlock({
+        url: block.url,
+        description: block.description,
+        semanticId: `${this.semanticPrefix}-image`
+      })
     } else {
       Row({ space: Spacing.SM }) {
         SymbolGlyph($r('sys.symbol.puzzle')).fontSize(18)
@@ -76,7 +155,15 @@ export struct PostRichContent {
   build() {
     Column({ space: Spacing.SM }) {
       ForEach(this.blocks, (block: ContentBlock, index: number) => {
-        this.blockView(block)
+        if (block.kind === ContentBlockKind.Image && block.url.length > 0) {
+          PostImageBlock({
+            url: block.url,
+            description: block.description,
+            semanticId: `${this.semanticPrefix}-image-${index}`
+          })
+        } else {
+          this.blockView(block)
+        }
       }, (_block: ContentBlock, index: number) => index.toString())
     }
     .width('100%')

@@ -18,11 +18,11 @@
     },
     {
       "name": "primary",
-      "value": "#FF69C5DF"
+      "value": "#FF5B8FF9"
     },
     {
       "name": "primary_soft",
-      "value": "#FF163743"
+      "value": "#FF1B3158"
     },
     {
       "name": "text_primary",
@@ -58,11 +58,11 @@
     },
     {
       "name": "quote_background",
-      "value": "#FF17313A"
+      "value": "#FF1C2E4A"
     },
     {
       "name": "brand_primary",
-      "value": "#FF69C5DF"
+      "value": "#FF5B8FF9"
     },
     {
       "name": "brand_accent",
@@ -70,7 +70,7 @@
     },
     {
       "name": "brand_soft",
-      "value": "#FF163743"
+      "value": "#FF1B3158"
     },
     {
       "name": "surface_elevated",
@@ -102,7 +102,7 @@
     },
     {
       "name": "avatar_background",
-      "value": "#FF20414B"
+      "value": "#FF20365A"
     },
     {
       "name": "hds_title_bar_scrolled_bg",

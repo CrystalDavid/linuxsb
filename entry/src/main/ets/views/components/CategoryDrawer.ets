@@ -4,20 +4,17 @@ import { CategoryUiModel } from '../../models/presentation/ForumUiModels';
 import { ChoiceChip } from './ChoiceChip';
 
 export enum HomeFeedSort {
-  Latest = 'Latest',
   NewComments = 'NewComments',
-  NewTopics = 'NewTopics',
-  Featured = 'Featured'
+  NewTopics = 'NewTopics'
 }
 
 @Component
 export struct CategoryDrawer {
   @Prop categories: CategoryUiModel[] = [];
-  @Prop selectedSort: HomeFeedSort = HomeFeedSort.Latest;
+  @Prop selectedSort: HomeFeedSort = HomeFeedSort.NewComments;
   @Prop selectedCategoryId: number = 0;
-  @Prop appliedSort: HomeFeedSort = HomeFeedSort.Latest;
+  @Prop appliedSort: HomeFeedSort = HomeFeedSort.NewComments;
   @Prop appliedCategoryId: number = 0;
-  @Prop showFeatured: boolean = false;
   onSortChange: (sort: HomeFeedSort) => void = () => {};
   onCategoryChange: (categoryId: number) => void = () => {};
   onApply: () => void = () => {};
@@ -28,18 +25,14 @@ export struct CategoryDrawer {
   @Builder
   private drawerHeader() {
     Row() {
-      Text('筛选')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(SemanticColors.textPrimary())
-        .layoutWeight(1)
+      Blank().layoutWeight(1)
       if (this.isDirty()) {
         Text('重置')
           .fontSize(13)
           .fontColor(AppColors.brandPrimary())
           .padding({ left: 8, right: 8, top: 6, bottom: 6 })
           .onClick(() => {
-            this.onSortChange(HomeFeedSort.Latest);
+            this.onSortChange(HomeFeedSort.NewComments);
             this.onCategoryChange(0);
           })
       }
@@ -49,7 +42,7 @@ export struct CategoryDrawer {
           .fontColor([SemanticColors.textSecondary()])
       }
       .id('category-drawer-close')
-      .accessibilityText('关闭筛选抽屉')
+      .accessibilityText('关闭主题选项')
       .width(32)
       .height(32)
       .justifyContent(FlexAlign.Center)
@@ -66,11 +59,6 @@ export struct CategoryDrawer {
     Column() {
       Flex({ wrap: FlexWrap.Wrap }) {
         ChoiceChip({
-          label: '最新',
-          selected: this.selectedSort === HomeFeedSort.Latest,
-          onSelect: () => this.onSortChange(HomeFeedSort.Latest)
-        })
-        ChoiceChip({
           label: '新评论',
           selected: this.selectedSort === HomeFeedSort.NewComments,
           onSelect: () => this.onSortChange(HomeFeedSort.NewComments)
@@ -80,13 +68,6 @@ export struct CategoryDrawer {
           selected: this.selectedSort === HomeFeedSort.NewTopics,
           onSelect: () => this.onSortChange(HomeFeedSort.NewTopics)
         })
-        if (this.showFeatured) {
-          ChoiceChip({
-            label: '精华',
-            selected: this.selectedSort === HomeFeedSort.Featured,
-            onSelect: () => this.onSortChange(HomeFeedSort.Featured)
-          })
-        }
       }
       .width('100%')
     }
@@ -94,29 +75,6 @@ export struct CategoryDrawer {
     .width('100%')
     .padding({ left: 16, right: 16, top: 2 })
     .alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  private categoryTabBar() {
-    Column() {
-      Row() {
-        Text('版块')
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.brandPrimary())
-      }
-      .height(38)
-      .alignItems(VerticalAlign.Center)
-      Row()
-        .width(24)
-        .height(2)
-        .borderRadius(1)
-        .backgroundColor(AppColors.brandPrimary())
-    }
-    .id('category-drawer-tab')
-    .width('100%')
-    .alignItems(HorizontalAlign.Center)
-    .padding({ left: 16, right: 16 })
   }
 
   @Builder
@@ -188,8 +146,7 @@ export struct CategoryDrawer {
       Divider()
         .strokeWidth(0.5)
         .color(SemanticColors.divider())
-        .margin({ left: 16, right: 16 })
-      this.categoryTabBar()
+        .margin({ left: 16, right: 16, top: 6, bottom: 4 })
       Scroll() {
         Column() {
           this.categoryRow(0, '全部版块')
@@ -244,9 +201,6 @@ export struct CategoryDrawer {
     if (this.selectedSort === HomeFeedSort.NewTopics) {
       return '新帖子';
     }
-    if (this.selectedSort === HomeFeedSort.Featured) {
-      return '精华';
-    }
-    return '最新';
+    return '新评论';
   }
 }

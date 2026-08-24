@@ -7,6 +7,7 @@ export class TopicPrefetchCoordinator {
   private source: TopicPrefetchPort;
   private generation: number = 0;
   private startDelayMs: number;
+  private scheduledKey: string = '';
 
   constructor(source: TopicPrefetchPort, startDelayMs: number = 500) {
     this.source = source;
@@ -14,11 +15,16 @@ export class TopicPrefetchCoordinator {
   }
 
   schedule(topicIds: number[]): void {
-    const generation = ++this.generation;
     const queue = this.uniquePositive(topicIds, 3);
     if (queue.length === 0) {
       return;
     }
+    const key = queue.join(',');
+    if (key === this.scheduledKey) {
+      return;
+    }
+    this.scheduledKey = key;
+    const generation = ++this.generation;
     if (this.startDelayMs === 0) {
       this.startWorkers(queue, generation);
       return;
@@ -28,6 +34,7 @@ export class TopicPrefetchCoordinator {
 
   cancel(): void {
     this.generation++;
+    this.scheduledKey = '';
   }
 
   private async runWorker(queue: number[], startIndex: number, generation: number): Promise<void> {

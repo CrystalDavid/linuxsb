@@ -33,6 +33,7 @@ export class TopicDetailViewModel {
 
   async open(topicId: number, summary: TopicUiModel | undefined): Promise<void> {
     const generation = ++this.generation;
+    const preserveSameTopic = this.topicId === topicId && this.presentationDetail !== undefined;
     this.topicId = topicId;
     this.summary = summary;
     this.mountedReplyCount = 10;
@@ -46,6 +47,14 @@ export class TopicDetailViewModel {
       this.refreshFromSource(topicId, true, generation, true);
       return;
     }
+    if (preserveSameTopic) {
+      this.state = ViewLoadState.Content;
+      this.errorMessage = '';
+      await this.refreshFromSource(topicId, false, generation, true);
+      return;
+    }
+    this.detail = undefined;
+    this.presentationDetail = undefined;
     this.state = ViewLoadState.Loading;
     this.errorMessage = '';
     await this.refreshFromSource(topicId, false, generation, false);
@@ -142,10 +151,9 @@ export class TopicDetailViewModel {
     }
     if (this.topicId > 0) {
       const generation = ++this.generation;
-      this.state = ViewLoadState.Loading;
-      this.detail = undefined;
-      this.presentationDetail = undefined;
-      await this.refreshFromSource(this.topicId, true, generation, false);
+      const preserveContent = this.presentationDetail !== undefined;
+      this.state = preserveContent ? ViewLoadState.Content : ViewLoadState.Loading;
+      await this.refreshFromSource(this.topicId, true, generation, preserveContent);
     }
   }
 }
