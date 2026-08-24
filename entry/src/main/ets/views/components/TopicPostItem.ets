@@ -70,6 +70,8 @@ export struct TopicPostItem {
 
   private postMetaLabel(): string {
     const role = this.mainPost ? '楼主' : `#${this.post.floor} 楼`;
-    return this.post.postedAtLabel.length > 0 ? `${role} · ${this.post.postedAtLabel}` : role;
+    const thread = !this.mainPost && this.post.parentFloor > 0 ? ` · 回复 #${this.post.parentFloor}` : '';
+    const time = this.post.postedAtLabel.length > 0 ? ` · ${this.post.postedAtLabel}` : '';
+    return `${role}${thread}${time}`;
   }
 }

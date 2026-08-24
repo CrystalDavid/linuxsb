@@ -67,7 +67,6 @@ export struct P0ProbePage {
 
   aboutToDisappear(): void {
     this.transport.close();
-    cookieSessionBroker.clearMemory();
   }
 
   private async runHomeProbe(): Promise<void> {
@@ -353,13 +352,15 @@ export struct P0ProbePage {
 
   private replyContractMatches(replies: ReplyProbeSummary[], mainPostId: number): boolean {
     const replyIds = new Set<number>();
+    const floors = new Set<number>();
     for (let index = 0; index < replies.length; index++) {
       const reply = replies[index];
       if (reply.replyId <= 0 || reply.replyId === mainPostId || replyIds.has(reply.replyId) ||
-        reply.floor !== index + 1 || reply.author.length === 0 || reply.bodyText.length === 0) {
+        reply.floor <= 0 || floors.has(reply.floor) || reply.author.length === 0 || reply.bodyText.length === 0) {
         return false;
       }
       replyIds.add(reply.replyId);
+      floors.add(reply.floor);
     }
     return replies.length > 0;
   }
@@ -391,7 +392,8 @@ export struct P0ProbePage {
         fieldsComplete = false;
       }
       replyIds.add(reply.replyId);
-      floors += `${index === 0 ? '' : ','}${reply.floor}`;
+      const parent = (reply.parentFloor ?? 0) > 0 ? `>${reply.parentFloor}` : '';
+      floors += `${index === 0 ? '' : ','}${reply.floor}${parent}`;
     }
     return `回复 ID 唯一：${idsUnique ? '是' : '否'} · 主楼重复：${mainRepeated ? '是' : '否'} · 楼层：${floors.length > 0 ? floors : '无'} · 作者/正文最小字段：${fieldsComplete && replies.length > 0 ? '完整' : '不完整'}`;
   }

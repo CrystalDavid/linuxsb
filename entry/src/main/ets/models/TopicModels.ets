@@ -45,6 +45,7 @@ export interface TopicPost {
 export interface Reply {
   replyId: number;
   floor: number;
+  parentFloor?: number;
   author: Author;
   postedAtLabel?: string;
   content: ContentBlock[];

@@ -43,6 +43,7 @@ export interface ProtocolRewardExtension {
 export interface ProtocolPostDocument {
   postId: number;
   floor: number;
+  parentFloor?: number;
   author: string;
   authorId?: number;
   authorAvatarUrl?: string;
@@ -55,6 +56,7 @@ export interface ProtocolPostDocument {
 export interface TopicProtocolReply {
   replyId: number;
   floor: number;
+  parentFloor?: number;
   author: string;
   bodyText: string;
 }

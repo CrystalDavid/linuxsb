@@ -82,6 +82,7 @@ export class TopicPresentationMapper {
     const output = new ReplyUiModel();
     output.postId = source.replyId;
     output.floor = source.floor;
+    output.parentFloor = source.parentFloor ?? 0;
     output.author = this.mapAuthor(source.author);
     output.postedAtLabel = source.postedAtLabel ?? '';
     output.content = source.content;

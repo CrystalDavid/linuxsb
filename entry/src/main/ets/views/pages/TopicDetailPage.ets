@@ -113,12 +113,14 @@ export struct TopicDetailPage {
         .backgroundColor(Color.Transparent)
         .onClick(() => this.viewModel.retryLoadMore())
     } else if (detail.nextPageUrl.length > 0 || this.viewModel.mountedReplyCount < detail.replies.length) {
-      Text('继续向下加载')
+      Button('继续向下加载')
+        .id('topic-load-more-batch')
         .fontSize(12)
         .fontColor(SemanticColors.textTertiary())
         .width('100%')
         .height(40)
-        .textAlign(TextAlign.Center)
+        .backgroundColor(Color.Transparent)
+        .onClick(() => this.viewModel.onReplyListReachEnd())
     }
   }
 

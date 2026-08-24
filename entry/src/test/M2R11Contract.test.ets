@@ -27,8 +27,9 @@ import {
 } from '../main/ets/services/transport/ForumTransport';
 import { TopicDetailViewModel } from '../main/ets/viewmodels/TopicDetailViewModel';
 
-function replyMarkup(id: number, floor: number): string {
-  return `<li class="post-item post-entry" id="post-${id}" data-floor="${floor}">` +
+function replyMarkup(id: number, floor: number, parentFloor: number = 0): string {
+  const parent = parentFloor > 0 ? ` data-quote-threads-parent-floor="${parentFloor}"` : '';
+  return `<li class="post-item post-entry" id="post-${id}" data-floor="${floor}"${parent}>` +
     `<a class="post-author" href="/user/${id}">user-${floor}</a>` +
     `<div class="post-content"><p>reply-${floor}</p></div></li>`;
 }
@@ -162,6 +163,7 @@ class PageDecoder implements ProductDecodePort {
   pageTwoTotal: number = 75;
   pageTwoCount: number = 25;
   failPageTwoOnce: boolean = false;
+  threadedOrder: boolean = false;
 
   async decodeHome(_html: string, _inputBytes: number): Promise<HomeProductDecodeResult> {
     const document: HomeProtocolDocument = { protocolMatched: true, bbsVersion: 'v8.6.5', topics: [], warnings: [] };
@@ -169,6 +171,21 @@ class PageDecoder implements ProductDecodePort {
   }
 
   async decodeTopic(html: string, _inputBytes: number, _topicId: number): Promise<TopicProductDecodeResult> {
+    if (this.threadedOrder) {
+      const threaded = html === 'page-2' ? protocolDocument(5, 2, 2, 4, '') :
+        protocolDocument(5, 1, 3, 1, 'https://linux.sb/topic/15365?p=2');
+      threaded.totalPages = 2;
+      if (html === 'page-2') {
+        threaded.replies = [threaded.replies[1], threaded.replies[0]];
+        threaded.posts = [threaded.posts[1], threaded.posts[0]];
+        threaded.replies[0].parentFloor = 1;
+      } else {
+        threaded.replies = [threaded.replies[0], threaded.replies[2], threaded.replies[1]];
+        threaded.posts = [threaded.posts[0], threaded.posts[1], threaded.posts[3], threaded.posts[2]];
+        threaded.replies[1].parentFloor = 1;
+      }
+      return { execution: 'TASKPOOL', executionWarning: '', parseMs: 2, inputBytes: 1024, document: threaded };
+    }
     if (html === 'page-2' && this.failPageTwoOnce) {
       this.failPageTwoOnce = false;
       const failedDocument = protocolDocument(75, 2, 25, 51, '');
@@ -216,6 +233,18 @@ export default function m2r11ContractTest() {
       expect(second.replies.length).assertEqual(25);
     });
 
+    it('preserves quote-thread server order and captures the real parent floor', 0, () => {
+      const fixture = '<h1 class="post-content-title">Threaded</h1>' +
+        '<div class="post-content-stats"><span>9</span><span>3</span></div><ul>' +
+        '<li class="post-entry" id="post-15365"></li>' +
+        replyMarkup(20001, 1) + replyMarkup(20006, 6, 1) + replyMarkup(20002, 2) + '</ul>';
+      const result = new TopicProbeDecoder().decode(fixture, 15365);
+      expect(result.replies[0].floor).assertEqual(1);
+      expect(result.replies[1].floor).assertEqual(6);
+      expect(result.replies[1].parentFloor).assertEqual(1);
+      expect(result.replies[2].floor).assertEqual(2);
+    });
+
     it('deduplicates duplicate reply identifiers', 0, () => {
       const fixture = pageFixture(2, 1, 1, 1, true).replace('</ul>', replyMarkup(20001, 2) + '</ul>');
       const result = new TopicProbeDecoder().decode(fixture, 15365);
@@ -257,7 +286,8 @@ export default function m2r11ContractTest() {
       const fixture = '<li class="post-entry" id="post-605"><div class="post-avatar">' +
         '<a href="/user/1"><img class="avatar-img" src="/avatar/1.jpg"></a></div>' +
         '<div class="post-body"><a class="post-author" href="/user/1">editor</a>' +
-        '<div class="post-meta"><span>10 分钟前</span></div></div><div class="post-content">' +
+        '<div class="post-meta"><span class="quote-threads-reference">回复 #1</span>' +
+        '<span data-performance-time="1">10 分钟前</span></div></div><div class="post-content">' +
         '<div class="long-content-fold-content"><p>正文</p><div class="sb-limit-edit-time-note">' +
         '最后由 <a href="/user/1">editor</a> 编辑于 now</div>' +
         '</div></div></li>';
@@ -299,6 +329,21 @@ export default function m2r11ContractTest() {
       expect(complete.data?.replies[0].floor).assertEqual(1);
       expect(complete.data?.replies[74].floor).assertEqual(75);
       expect(complete.data?.replyPage?.nextPageUrl).assertEqual('');
+    });
+
+    it('keeps BBS1 quote-thread order while appending the next page', 0, async () => {
+      const decoder = new PageDecoder();
+      decoder.threadedOrder = true;
+      const repository = new TopicRepository(new PageTransport(), decoder, new AnonymousSession());
+      expect((await repository.loadTopic(15365)).ok).assertTrue();
+      const complete = await repository.loadNextReplyPage(15365);
+      expect(complete.ok).assertTrue();
+      expect(complete.data?.replies[0].floor).assertEqual(1);
+      expect(complete.data?.replies[1].floor).assertEqual(3);
+      expect(complete.data?.replies[2].floor).assertEqual(2);
+      expect(complete.data?.replies[3].floor).assertEqual(5);
+      expect(complete.data?.replies[4].floor).assertEqual(4);
+      expect(complete.data?.replies[1].parentFloor).assertEqual(1);
     });
 
     it('retries page two without duplicating appended replies', 0, async () => {
@@ -364,6 +409,27 @@ export default function m2r11ContractTest() {
       await viewModel.onReplyListViewport(11);
       expect(viewModel.visibleReplies().length).assertEqual(20);
       expect(transport.nextPageCalls).assertEqual(0);
+    });
+
+    it('loads page two after mounting page one and never fetches it twice', 0, async () => {
+      const transport = new PageTransport();
+      const repository = new TopicRepository(transport, new PageDecoder(), new AnonymousSession());
+      const viewModel = new TopicDetailViewModel(repository);
+      await viewModel.open(15365, undefined);
+      for (let batch = 0; batch < 4; batch++) {
+        await viewModel.onReplyListReachEnd();
+      }
+      expect(viewModel.visibleReplies().length).assertEqual(50);
+      expect(transport.nextPageCalls).assertEqual(0);
+      await viewModel.onReplyListReachEnd();
+      expect(transport.nextPageCalls).assertEqual(1);
+      expect(viewModel.presentationDetail?.replies.length).assertEqual(75);
+      expect(viewModel.visibleReplies().length).assertEqual(60);
+      await viewModel.onReplyListReachEnd();
+      await viewModel.onReplyListReachEnd();
+      await viewModel.onReplyListReachEnd();
+      expect(viewModel.visibleReplies().length).assertEqual(75);
+      expect(transport.nextPageCalls).assertEqual(1);
     });
 
     it('switches the TopicDetailHeader between summary and collapsed title states', 0, () => {

@@ -32,6 +32,7 @@ export interface HomeProbeResult {
 export interface ReplyProbeSummary {
   replyId: number;
   floor: number;
+  parentFloor?: number;
   author: string;
   bodyText: string;
 }

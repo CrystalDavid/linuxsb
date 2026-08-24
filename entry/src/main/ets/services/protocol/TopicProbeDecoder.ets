@@ -5,6 +5,7 @@ import { collapseWhitespace, hasClass, parseFirstUnsigned, parsePrefixedId } fro
 class PostDraft {
   postId: number = 0;
   floor: number = 0;
+  parentFloor: number = 0;
   author: string = '';
   bodyText: string = '';
 }
@@ -91,6 +92,9 @@ export class TopicProbeDecoder {
           postListItemDepth = 1;
           currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
           currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
+          currentPost.parentFloor = parseFirstUnsigned(
+            token.attributes.get('data-quote-threads-parent-floor') ?? ''
+          );
           if (mainPostId === 0 && currentPost.postId > 0) {
             mainPostId = currentPost.floor > 0 && expectedTopicId > 0 ? expectedTopicId : currentPost.postId;
           }
@@ -301,6 +305,12 @@ export class TopicProbeDecoder {
       warnings.push(`REPLY_BODY_MISSING:${post.postId}`);
     }
     replyIds.add(post.postId);
-    replies.push({ replyId: post.postId, floor: post.floor, author: post.author, bodyText: post.bodyText });
+    replies.push({
+      replyId: post.postId,
+      floor: post.floor,
+      parentFloor: post.parentFloor > 0 ? post.parentFloor : undefined,
+      author: post.author,
+      bodyText: post.bodyText
+    });
   }
 }

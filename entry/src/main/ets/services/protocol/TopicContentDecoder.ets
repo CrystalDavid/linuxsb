@@ -13,6 +13,7 @@ const MAX_TEXT_PER_BLOCK = 8192;
 class PostContentDraft {
   postId: number = 0;
   floor: number = 0;
+  parentFloor: number = 0;
   author: string = '';
   authorId: number = 0;
   authorAvatarUrl: string = '';
@@ -33,6 +34,7 @@ export class TopicContentDecoder {
     let authorRootDepth = 0;
     let authorText = '';
     let postMetaRootDepth = 0;
+    let postMetaSkipRootDepth = 0;
     let postMetaText = '';
     let postContentRootDepth = 0;
     let bodyRootDepth = 0;
@@ -127,6 +129,9 @@ export class TopicContentDecoder {
             currentPost = new PostContentDraft();
             currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
             currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
+            currentPost.parentFloor = parseFirstUnsigned(
+              token.attributes.get('data-quote-threads-parent-floor') ?? ''
+            );
             postRootDepth = treeDepth;
           }
           return;
@@ -146,6 +151,10 @@ export class TopicContentDecoder {
         if (token.name === 'div' && hasClass(token.attributes, 'post-meta') && postContentRootDepth === 0) {
           postMetaRootDepth = treeDepth;
           postMetaText = '';
+          return;
+        }
+        if (postMetaRootDepth > 0 && hasClass(token.attributes, 'quote-threads-reference')) {
+          postMetaSkipRootDepth = treeDepth;
           return;
         }
         if (token.name === 'div' && hasClass(token.attributes, 'post-content') && postContentRootDepth === 0) {
@@ -272,7 +281,7 @@ export class TopicContentDecoder {
         }
         if (authorRootDepth > 0) {
           authorText += token.text;
-        } else if (postMetaRootDepth > 0) {
+        } else if (postMetaRootDepth > 0 && postMetaSkipRootDepth === 0) {
           postMetaText += token.text;
         } else if (editedRootDepth > 0) {
           editedText += token.text;
@@ -309,6 +318,9 @@ export class TopicContentDecoder {
         authorText = '';
         authorRootDepth = 0;
       }
+      if (postMetaSkipRootDepth > 0 && treeDepth === postMetaSkipRootDepth) {
+        postMetaSkipRootDepth = 0;
+      }
       if (postMetaRootDepth > 0 && treeDepth === postMetaRootDepth && token.name === 'div') {
         currentPost.postedAtLabel = collapseWhitespace(postMetaText);
         postMetaText = '';
@@ -344,6 +356,7 @@ export class TopicContentDecoder {
         postRootDepth = 0;
         authorRootDepth = 0;
         postMetaRootDepth = 0;
+        postMetaSkipRootDepth = 0;
         postContentRootDepth = 0;
         bodyRootDepth = 0;
         skippedRootDepth = 0;
@@ -377,6 +390,7 @@ export class TopicContentDecoder {
     posts.push({
       postId: post.postId,
       floor: post.floor,
+      parentFloor: post.parentFloor > 0 ? post.parentFloor : undefined,
       author: post.author,
       authorId: post.authorId,
       authorAvatarUrl: post.authorAvatarUrl,

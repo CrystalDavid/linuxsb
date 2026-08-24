@@ -329,6 +329,7 @@ export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
       replies.push({
         replyId: item.replyId,
         floor: item.floor,
+        parentFloor: item.parentFloor,
         author: this.author(protocolPost?.author ?? item.author, protocolPost?.authorId ?? 0,
           protocolPost?.authorAvatarUrl ?? ''),
         postedAtLabel: protocolPost?.postedAtLabel,
@@ -368,7 +369,6 @@ export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
     for (let index = 0; index < incoming.length; index++) {
       appendUnique(incoming[index]);
     }
-    merged.sort((left: Reply, right: Reply) => left.floor - right.floor);
     const totalReplyCount = document.advertisedReplyCount;
     const totalPages = Math.max(existing.replyPage?.totalPages ?? 1, document.totalPages ?? 1);
     const nextPageUrl = document.nextPageUrl ?? '';
@@ -419,7 +419,6 @@ export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
     for (let index = 0; index < existing.replies.length; index++) {
       appendUnique(existing.replies[index]);
     }
-    merged.sort((left: Reply, right: Reply) => left.floor - right.floor);
     const freshPage = fresh.replyPage as TopicReplyPage;
     const needsPageRefresh = merged.length < fresh.advertisedReplyCount;
     fresh.replies = merged;

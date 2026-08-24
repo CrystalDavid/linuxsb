@@ -71,6 +71,7 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
     replies.push({
       replyId: item.replyId,
       floor: item.floor,
+      parentFloor: item.parentFloor,
       author: item.author,
       bodyText: item.bodyText
     });

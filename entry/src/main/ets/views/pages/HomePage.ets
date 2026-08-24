@@ -224,26 +224,20 @@ export struct HomePage {
   private titleBarContent() {
     Row({ space: Spacing.XS }) {
       this.menuButton()
-      Column({ space: 1 }) {
-        Text('烧饼社区')
-          .fontSize(Typography.HEADLINE)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(SemanticColors.textPrimary())
-          .maxLines(1)
-        Text('非官方客户端')
-          .fontSize(Typography.LABEL_SMALL)
-          .fontColor($r('app.color.brand_primary'))
-          .gesture(
-            LongPressGesture({ repeat: false, duration: MotionDuration.DEBUG_LONG_PRESS })
-              .onAction(() => {
-                if (this.debugAvailable) {
-                  this.onOpenDiagnostics();
-                }
-              })
-          )
-      }
+      Text('烧饼社区')
+        .fontSize(Typography.HEADLINE)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(SemanticColors.textPrimary())
+        .maxLines(1)
+        .gesture(
+          LongPressGesture({ repeat: false, duration: MotionDuration.DEBUG_LONG_PRESS })
+            .onAction(() => {
+              if (this.debugAvailable) {
+                this.onOpenDiagnostics();
+              }
+            })
+        )
       .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
       this.searchButton()
       this.accountButton()
     }
