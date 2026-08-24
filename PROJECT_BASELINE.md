@@ -14,7 +14,7 @@
 - 技术栈：ArkTS、Stage 模型、ArkUI、UI Design Kit、Remote Communication Kit、ArkWeb（仅登录）
 - 服务端前提：不修改 linux.sb，不依赖站长安装插件，不建设中转代理服务器
 
-应用内必须明确显示“非官方客户端”，不得让用户误以为由 linux.sb 站方发布。
+应用不得让用户误以为由 linux.sb 站方发布；非官方身份声明保留在关于、登录说明等合适位置，但正式首页不再永久展示“非官方客户端”副标题。
 
 ### 1.2 产品目标
 
@@ -159,7 +159,12 @@ M2-R1 的授权 UI、主题打开优化和 API 26 真机核心闭环已经形成
 - 普通 Home/Topic 必须保持纯 ArkUI；ArkWeb 只允许临时官方登录。新增 `NoWebOutsideLogin` 源码与 UI 结构自动检查。
 - 分页仅允许 RCP GET；首屏只取第一页，接近底部再取下一页；按 replyId 去重并维持楼层顺序、重试幂等和返回后已加载页状态。
 - P0-8 仍为 NOT RUN，禁止 POST、发帖、回复、编辑或删除。
-- 当前状态：分支与安全 checkpoint 为 PASS；实现、自动测试、ArkUI Inspector、Pura 90 和最终 API 26 验收均为 NOT RUN；M2-R1 总状态保持 FAIL。
+- 当前实现：PASS。Topic 15365 已按真实 `?p=2` href 建模为分页回复页；第一页 50 条采用 BBS1 引用树顺序，`data-quote-threads-parent-floor` 已进入协议、领域和 UI 模型，不再把合法引用树误报为 `REPLY_STRUCTURE_MISMATCH`。网页“展开全文”、引用控制文字、编辑元信息和打赏扩展已与正文分离。
+- 当前 Pura 90 自动回归：PASS。`hvigor test` 为 65/65，`onDeviceTest` 为 5/5，`NoWebOutsideLogin`、signed HAP 构建、覆盖安装和启动均通过；正式首页已移除“非官方客户端”副标题，dumpLayout 为 Home Web 0。
+- 当前登录态第一页实测：PASS。Topic 15365 的实时总回复数会变化；本次结构探针得到第一页 50 条、总数 87、1/2 页、真实下一页链接存在，回复 ID 唯一且主楼未重复。
+- 当前第二页 UI 懒加载复验：NOT RUN。最新版 HAP 覆盖安装后内存会话按设计清空，等待重新完成官方登录后验证 50 + 当前第二页余量的合并结果。
+- DevEco ArkUI Inspector：NOT RUN。Windows 桌面仍处于锁定状态，不能以 dumpLayout 代替真实 Inspector 操作。
+- 最终 API 26 真机复验：NOT RUN。M2-R1 总状态继续保持 FAIL，不创建 PASS 标签。
 
 ## 3. 协议适配原则
 
@@ -209,7 +214,7 @@ ProtocolAdapter
 - 可以复用沉浸布局、主题列表、头像、标签、筛选抽屉、FAB、主题详情、富正文和禁用输入栏等 UI 实现；
 - 必须改造 import、模型和回调，通过烧饼社区自己的 Presentation Adapter 消除 Discourse 业务依赖；
 - 不复用 LINUX DO Logo、等级、站点品牌文案或被明确排除的网络/服务模块；
-- 最终继续使用“烧饼社区”名称、非官方客户端身份、BBS1 协议和现有只读网络架构。
+- 最终继续使用“烧饼社区”名称、非官方身份声明、BBS1 协议和现有只读网络架构；正式首页不固定展示“非官方客户端”副标题。
 
 ### 4.2 首版页面
 

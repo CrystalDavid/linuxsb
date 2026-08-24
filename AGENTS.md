@@ -130,5 +130,12 @@
 - 真机最终进程日志：PASS；783 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、HTTP POST 0。
 - DevEco ArkUI Inspector 交互检查：NOT RUN（本轮桌面窗口焦点不稳定）；已用 TestKit 与 `dumpLayout` 完成组件层级、空白、抽屉边界和普通页面 Web 节点检查。
 - M2-R1 历史状态：FAIL；冷正文目标、高回复主题兼容性未全部通过，ArkUI Inspector 为 NOT RUN。
-- M2-R1.1 分支与安全 checkpoint：PASS；实现、测试、Inspector 和最终 API 26 复验均为 NOT RUN。
+- M2-R1.1 分支、安全 checkpoint、签名隔离和 artifacts 忽略：PASS。
+- Topic 15365 分页协议修复：PASS；登录态结构探针确认真实下一页 href，第一页 50 条为合法引用树顺序，实时声明总数本次为 87，`REPLY_STRUCTURE_MISMATCH` 已消除。
+- 正文边界、引用父楼层、分页去重/幂等、批量挂载与可点击加载兜底：PASS；固定 75 = 50 + 25 fixture 与动态总数测试均通过。
+- 正式首页“非官方客户端”副标题移除：PASS；最新版 Pura 90 dumpLayout 为该文字 0、Home Web 0。
+- 自动测试与构建：PASS；`hvigor test` 65/65、`onDeviceTest` 5/5、`NoWebOutsideLogin`、signed HAP 构建、覆盖安装和启动均通过。
+- 最新版登录后第二页 UI 合并复验：NOT RUN；覆盖安装后内存登录会话已按设计清空，等待重新完成官方登录。
+- DevEco ArkUI Inspector：NOT RUN；Windows 桌面仍处于锁定状态，不得用 dumpLayout 冒充 Inspector 结果。
+- 最终 API 26 真机复验：NOT RUN；M2-R1 总状态继续保持 FAIL，不创建 PASS 标签。
 - P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。
