@@ -1,4 +1,4 @@
-import { AppColors, Radius, SemanticColors } from '../../common/theme/DesignSystem';
+import { AppColors, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import { PostUiModel } from '../../models/presentation/ForumUiModels';
 import { PostRichContent } from './PostRichContent';
 import { UserAvatar } from './UserAvatar';
@@ -7,6 +7,7 @@ import { UserAvatar } from './UserAvatar';
 export struct TopicPostItem {
   post: PostUiModel = new PostUiModel();
   mainPost: boolean = false;
+  onReply: (post: PostUiModel) => void = () => {};
 
   private authorName(): string {
     return this.post.author.displayName.length > 0 ? this.post.author.displayName : '社区用户';
@@ -16,86 +17,12 @@ export struct TopicPostItem {
     return !this.mainPost && this.post.parentFloor > 0;
   }
 
-  private threadInset(): number {
-    return this.isThreadedReply() ? Math.min(2, Math.max(1, this.post.threadDepth)) * 12 : 0;
+  private avatarSize(): number {
+    return this.mainPost ? 44 : (this.isThreadedReply() ? 32 : 40);
   }
 
-  @Builder
-  private threadMarker() {
-    if (this.isThreadedReply()) {
-      Row({ space: 5 }) {
-        Text('↳')
-          .fontSize(13)
-          .fontColor(AppColors.brandPrimary())
-        Text(`楼中楼 · 回复 #${this.post.parentFloor}`)
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.brandPrimary())
-      }
-      .id(`reply-thread-indicator-${this.post.floor}`)
-      .alignSelf(ItemAlign.Start)
-      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-      .margin({ bottom: 8 })
-      .borderRadius(Radius.PILL)
-      .backgroundColor(AppColors.brandSoft())
-    }
-  }
-
-  @Builder
-  private postBody() {
-    Column() {
-      this.threadMarker()
-
-      Row() {
-        UserAvatar({
-          user: this.post.author,
-          avatarSize: 40,
-          semanticId: `post-avatar-${this.post.postId}`
-        })
-          .margin({ right: 12 })
-        Column({ space: 2 }) {
-          Text(this.authorName())
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(SemanticColors.textPrimary())
-            .maxLines(1)
-          Text(this.postMetaLabel())
-            .fontSize(13)
-            .fontColor(SemanticColors.textSecondary())
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      PostRichContent({ blocks: this.post.content, semanticPrefix: `post-content-${this.post.postId}` })
-        .width('100%')
-        .margin({ top: 12 })
-
-      if (this.post.editedMetadata !== undefined) {
-        Text(this.editedLabel())
-          .fontSize(12)
-          .fontColor(SemanticColors.textTertiary())
-          .width('100%')
-          .margin({ top: 10 })
-      }
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding({ left: 10 + this.threadInset(), right: 10, top: 12, bottom: 14 })
-    .border({ width: { left: this.isThreadedReply() ? 3 : 0 }, color: AppColors.brandPrimary() })
-    .backgroundColor(this.isThreadedReply() ? SemanticColors.surfaceMuted() : SemanticColors.surface())
-  }
-
-  build() {
-    Column() {
-      this.postBody()
-      Divider().strokeWidth(0.5).color(SemanticColors.divider())
-    }
-    .id(this.mainPost ? 'topic-main-post' : `topic-reply-${this.post.floor}`)
-    .width('100%')
-    .backgroundColor(SemanticColors.surface())
+  private horizontalInset(): number {
+    return this.isThreadedReply() ? 54 : 0;
   }
 
   private editedLabel(): string {
@@ -104,14 +31,127 @@ export struct TopicPostItem {
       return '';
     }
     if (metadata.editorName.length > 0) {
-      return `最后由 ${metadata.editorName} 编辑于 ${metadata.editedAt}`;
+      return `由 ${metadata.editorName} 编辑于 ${metadata.editedAt}`;
     }
     return metadata.editedAt;
   }
 
   private postMetaLabel(): string {
-    const role = this.mainPost ? '楼主' : `#${this.post.floor} 楼`;
+    const role = this.mainPost ? '楼主' : `#${this.post.floor}`;
     const time = this.post.postedAtLabel.length > 0 ? ` · ${this.post.postedAtLabel}` : '';
     return `${role}${time}`;
+  }
+
+  @Builder
+  private authorHeader() {
+    Row({ space: Spacing.XS }) {
+      Text(this.authorName())
+        .fontSize(this.mainPost ? Typography.BODY_LARGE : Typography.BODY)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(SemanticColors.textPrimary())
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      if (this.mainPost) {
+        Text('楼主')
+          .fontSize(Typography.LABEL_SMALL)
+          .fontColor(AppColors.brandPrimary())
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+          .backgroundColor(AppColors.brandSoft())
+          .borderRadius(Radius.PILL)
+      }
+      Blank()
+      Text(this.postMetaLabel())
+        .fontSize(Typography.CAPTION)
+        .fontColor(SemanticColors.textTertiary())
+        .maxLines(1)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  private threadContext() {
+    if (this.isThreadedReply()) {
+      Text(`回复 #${this.post.parentFloor}`)
+        .id(`reply-thread-indicator-${this.post.floor}`)
+        .fontSize(Typography.CAPTION)
+        .fontColor(AppColors.brandPrimary())
+        .margin({ top: Spacing.XS, bottom: Spacing.XS })
+    }
+  }
+
+  @Builder
+  private bodyColumn() {
+    Column({ space: 0 }) {
+      this.authorHeader()
+      this.threadContext()
+      PostRichContent({ blocks: this.post.content, semanticPrefix: `post-content-${this.post.postId}` })
+        .width('100%')
+        .margin({ top: this.isThreadedReply() ? 0 : Spacing.SM })
+      if (this.post.editedMetadata !== undefined) {
+        Text(this.editedLabel())
+          .fontSize(Typography.CAPTION)
+          .fontColor(SemanticColors.textTertiary())
+          .width('100%')
+          .margin({ top: Spacing.SM })
+      }
+      if (!this.mainPost) {
+        Row() {
+          Blank()
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Row({ space: Spacing.XXS }) {
+              SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
+                .fontSize(15)
+                .fontColor([SemanticColors.textTertiary()])
+              Text('回复')
+                .fontSize(Typography.CAPTION)
+                .fontColor(SemanticColors.textTertiary())
+            }
+          }
+          .id(`reply-action-${this.post.floor}`)
+          .height(30)
+          .backgroundColor(Color.Transparent)
+          .onClick(() => this.onReply(this.post))
+        }
+        .width('100%')
+        .margin({ top: Spacing.XS })
+      }
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  build() {
+    Column() {
+      Row({ space: Spacing.MD }) {
+        UserAvatar({
+          user: this.post.author,
+          avatarSize: this.avatarSize(),
+          semanticId: `post-avatar-${this.post.postId}`
+        })
+        this.bodyColumn()
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+      .padding({
+        left: Spacing.LG,
+        right: Spacing.LG,
+        top: this.mainPost ? Spacing.LG : Spacing.MD,
+        bottom: this.mainPost ? Spacing.LG : Spacing.MD
+      })
+
+      if (!this.isThreadedReply()) {
+        Divider()
+          .strokeWidth(0.5)
+          .color(SemanticColors.divider())
+          .margin({ left: Spacing.LG + this.avatarSize() + Spacing.MD, right: Spacing.LG })
+      }
+    }
+    .id(this.mainPost ? 'topic-main-post' : `topic-reply-${this.post.floor}`)
+    .width(`calc(100% - ${this.horizontalInset()}vp)`)
+    .margin({ left: this.horizontalInset(), right: this.isThreadedReply() ? Spacing.LG : 0,
+      top: this.isThreadedReply() ? Spacing.XS : 0, bottom: this.isThreadedReply() ? Spacing.XS : 0 })
+    .backgroundColor(this.isThreadedReply() ? SemanticColors.surfaceMuted() : SemanticColors.surface())
+    .borderRadius(this.isThreadedReply() ? Radius.MD : 0)
   }
 }

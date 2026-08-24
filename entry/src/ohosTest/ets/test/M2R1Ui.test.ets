@@ -1,10 +1,9 @@
 import { bundleManager, Want } from '@kit.AbilityKit';
 import { abilityDelegatorRegistry, Component, Driver, ON } from '@kit.TestKit';
 import { beforeEach, describe, expect, it } from '@ohos/hypium';
-import display from '@ohos.display';
 
 const WAIT_MS: number = 20000;
-const SETTLE_MS: number = 500;
+const SETTLE_MS: number = 450;
 let driver: Driver = Driver.create();
 
 function productWant(): Want {
@@ -40,80 +39,88 @@ async function hasId(id: string): Promise<boolean> {
   return components !== null && components !== undefined && components.length > 0;
 }
 
-async function hasText(text: string): Promise<boolean> {
-  const components = await driver.findComponents(ON.text(text));
-  return components !== null && components !== undefined && components.length > 0;
+async function openTab(id: string, pageId: string): Promise<void> {
+  await (await componentById(id)).click();
+  await componentById(pageId);
 }
 
 async function returnToHome(): Promise<void> {
   await abilityDelegatorRegistry.getAbilityDelegator().startAbility(productWant());
-  await driver.delayMs(SETTLE_MS);
-  for (let attempt = 0; attempt < 4 && !(await hasId('home-page')); attempt++) {
+  await componentById('root-tab-page');
+  for (let attempt = 0; attempt < 3 && !(await hasId('immersive-bottom-tab-bar')); attempt++) {
     await driver.pressBack();
     await driver.delayMs(SETTLE_MS);
+  }
+  await componentById('immersive-bottom-tab-bar');
+  if (!(await hasId('home-page'))) {
+    await (await componentById('bottom-tab-首页')).click();
   }
   await componentById('home-page');
 }
 
 export default function m2r1UiTest() {
-  describe('M2-R1 semantic UI regression', () => {
+  describe('M3 native community shell semantic UI regression', () => {
     beforeEach(async () => {
       await returnToHome();
-    })
+    });
 
-    it('starts in the compact formal Home without a Web node', 0, async () => {
-      await componentById('root-tab-page');
-      await componentById('home-menu');
-      await componentById('home-search');
-      await componentById('home-account');
+    it('starts in the native Home with the five-position immersive tab bar', 0, async () => {
       await componentById('home-topic-list');
+      await componentById('bottom-tab-首页');
+      await componentById('bottom-tab-板块');
+      await componentById('bottom-tab-compose');
+      await componentById('bottom-tab-搜索');
+      await componentById('bottom-tab-我的');
       expect((await componentsByType('Web')).length).assertEqual(0);
-    })
+    });
 
-    it('keeps the Drawer geometry compact and closes semantically', 0, async () => {
-      await (await componentById('home-menu')).click();
-      const drawer = await componentById('category-drawer');
-      const bounds = await drawer.getBounds();
-      const density = display.getDefaultDisplaySync().densityPixels;
-      const drawerWidthVp = (bounds.right - bounds.left) / density;
-      expect(Math.abs(drawerWidthVp - 288) <= 2).assertTrue();
-
-      const headerBounds = await (await componentById('category-drawer-header')).getBounds();
-      const filterBounds = await (await componentById('category-drawer-filters')).getBounds();
-      const firstRowBounds = await (await componentById('category-0')).getBounds();
-      const headerHeightVp = (headerBounds.bottom - headerBounds.top) / density;
-      const headerToFiltersVp = (filterBounds.top - headerBounds.bottom) / density;
-      const rowHeightVp = (firstRowBounds.bottom - firstRowBounds.top) / density;
-      expect(headerHeightVp >= 50 && headerHeightVp <= 58).assertTrue();
-      expect(headerToFiltersVp >= 0 && headerToFiltersVp <= 16).assertTrue();
-      expect(Math.abs(rowHeightVp - 48) <= 1).assertTrue();
-      await componentById('choice-新评论');
-      await componentById('choice-新帖子');
-      expect(await hasId('choice-最新')).assertFalse();
-      expect(await hasText('筛选')).assertFalse();
-      expect(await hasText('版块')).assertFalse();
-      await componentById('category-drawer-confirm-bar');
-      await (await componentById('category-drawer-close')).click();
-      await driver.delayMs(SETTLE_MS);
-      expect(await hasId('category-drawer')).assertFalse();
-    })
-
-    it('NoWebOutsideLogin keeps Home and Topic native while navigating immediately', 0, async () => {
+    it('switches among Boards Search Mine and Home without a Web node', 0, async () => {
+      await openTab('bottom-tab-板块', 'forums-page');
       expect((await componentsByType('Web')).length).assertEqual(0);
+      await openTab('bottom-tab-搜索', 'search-page');
+      expect((await componentsByType('Web')).length).assertEqual(0);
+      await openTab('bottom-tab-我的', 'profile-page');
+      expect((await componentsByType('Web')).length).assertEqual(0);
+      await openTab('bottom-tab-首页', 'home-page');
+    });
+
+    it('opens the native composer without submitting real content', 0, async () => {
+      await (await componentById('bottom-tab-compose')).click();
+      await componentById('compose-topic-page');
+      await componentById('compose-title');
+      await componentById('compose-body');
+      await componentById('compose-submit');
+      expect((await componentsByType('Web')).length).assertEqual(0);
+      await (await componentById('compose-back')).click();
+      await componentById('home-page');
+    });
+
+    it('closes the temporary login Web before resuming the native page', 0, async () => {
+      await openTab('bottom-tab-我的', 'profile-page');
+      if (await hasId('profile-login-required')) {
+        await (await componentById('profile-login-action')).click();
+        await componentById('official-login-complete');
+        expect((await componentsByType('Web')).length).assertEqual(1);
+        await (await componentById('official-login-complete')).click();
+        await componentById('profile-page');
+        await driver.delayMs(SETTLE_MS);
+        expect((await componentsByType('Web')).length).assertEqual(0);
+      }
+      await openTab('bottom-tab-首页', 'home-page');
+    });
+
+    it('navigates immediately to a native Topic and exposes the simple reply bar', 0, async () => {
       const firstTopic = await componentById('home-first-topic');
       await firstTopic.click();
       await componentById('topic-detail-page');
       const skeletonOrContent = (await hasId('topic-skeleton')) || (await hasId('topic-post-list'));
       expect(skeletonOrContent).assertTrue();
-      await componentById('comment-input-disabled');
+      await componentById('comment-input-bar');
+      await componentById('topic-reply-input');
+      await componentById('topic-reply-send');
       expect((await componentsByType('Web')).length).assertEqual(0);
       await driver.pressBack();
       await componentById('home-page');
-    })
-
-    it('keeps the Home write affordance disabled and Web-free', 0, async () => {
-      await (await componentById('home-write-fab')).click();
-      expect((await componentsByType('Web')).length).assertEqual(0);
-    })
-  })
+    });
+  });
 }

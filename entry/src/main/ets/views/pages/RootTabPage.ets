@@ -1,6 +1,7 @@
 import { bundleManager } from '@kit.AbilityKit';
 import {
   buildTopicRouteParam,
+  COMPOSE_ROUTE,
   DIAGNOSTICS_ROUTE,
   isTopicRouteParam,
   TOPIC_ROUTE,
@@ -12,8 +13,13 @@ import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { HomePage } from './HomePage';
+import { ComposeTopicPage } from './ComposeTopicPage';
+import { ForumsPage } from './ForumsPage';
 import { P0ProbePage } from './P0ProbePage';
+import { ProfilePage } from './ProfilePage';
+import { SearchPage } from './SearchPage';
 import { TopicDetailPage } from './TopicDetailPage';
+import { CommunityTab, ImmersiveBottomTabBar } from '../components/ImmersiveBottomTabBar';
 
 function isDebugPackage(): boolean {
   try {
@@ -33,6 +39,7 @@ export struct RootTabPage {
   @State private authenticated: boolean = false;
   @State private loginReturnTopicId: number = 0;
   @State private ignoreTopicTapUntil: number = 0;
+  @State private selectedTab: CommunityTab = CommunityTab.Home;
   private debugPackage: boolean = isDebugPackage();
 
   aboutToAppear(): void {
@@ -76,6 +83,21 @@ export struct RootTabPage {
     this.showOfficialLogin = true;
   }
 
+  private openComposer(): void {
+    this.pathStack.pushPathByName(COMPOSE_ROUTE, null);
+  }
+
+  private openCreatedTopic(topicId: number): void {
+    if (topicId <= 0) {
+      return;
+    }
+    this.pathStack.pop();
+    const topic = new TopicUiModel();
+    topic.topicId = topicId;
+    topic.title = '刚刚发表的主题';
+    this.openTopic(topic);
+  }
+
   private requestTopicLogin(routeParam: TopicRouteParam): void {
     this.loginReturnsToTopic = true;
     this.loginReturnTopicId = routeParam.topicId;
@@ -97,6 +119,17 @@ export struct RootTabPage {
     const returnTopicId = this.loginReturnTopicId;
     const currentRoute = this.currentTopicRoute();
     this.showOfficialLogin = false;
+    this.loginReturnsToTopic = false;
+    this.loginReturnTopicId = 0;
+    // Let ArkUI remove the temporary ArkWeb before synchronously reading its cookie store.
+    // This keeps the close interaction responsive even when the Web process is busy.
+    setTimeout(() => {
+      this.completeOfficialLogin(returnsToTopic, returnTopicId, currentRoute);
+    }, 0);
+  }
+
+  private completeOfficialLogin(returnsToTopic: boolean, returnTopicId: number,
+    currentRoute: TopicRouteParam | undefined): void {
     if (returnsToTopic && returnTopicId > 0) {
       const returnSummary = currentRoute !== undefined && currentRoute.topicId === returnTopicId ?
         currentRoute.summary : m1Runtime.topicViewModel.summary;
@@ -110,8 +143,9 @@ export struct RootTabPage {
       m1Runtime.captureOfficialLogin();
     }
     this.authenticated = m1Runtime.hasMemorySession();
-    this.loginReturnsToTopic = false;
-    this.loginReturnTopicId = 0;
+    if (this.authenticated) {
+      m1Runtime.homeViewModel.load(true);
+    }
   }
 
   @Builder
@@ -122,8 +156,10 @@ export struct RootTabPage {
           viewModel: m1Runtime.topicViewModel,
           topicId: (param as TopicRouteParam).topicId,
           summary: (param as TopicRouteParam).summary,
+          authenticated: this.authenticated,
           onBack: () => this.pathStack.pop(),
-          onLogin: () => this.requestTopicLogin(param as TopicRouteParam)
+          onLogin: () => this.requestTopicLogin(param as TopicRouteParam),
+          onReply: (body: string) => m1Runtime.reply((param as TopicRouteParam).topicId, body)
         })
       }
       .hideTitleBar(true)
@@ -136,22 +172,71 @@ export struct RootTabPage {
       }
       .title('P0 开发诊断')
       .backgroundColor(SemanticColors.page())
+    } else if (routeName === COMPOSE_ROUTE) {
+      NavDestination() {
+        ComposeTopicPage({
+          catalogViewModel: m1Runtime.homeViewModel,
+          authenticated: this.authenticated,
+          onBack: () => this.pathStack.pop(),
+          onLogin: () => this.requestHomeLogin(),
+          onSubmit: (forumId: number, title: string, body: string) =>
+            m1Runtime.createTopic(forumId, title, body),
+          onCreated: (topicId: number) => this.openCreatedTopic(topicId)
+        })
+      }
+      .hideTitleBar(true)
+      .backgroundColor(SemanticColors.page())
     }
+  }
+
+  @Builder
+  private rootTabContent() {
+    Stack({ alignContent: Alignment.Bottom }) {
+      if (this.selectedTab === CommunityTab.Home) {
+        HomePage({
+          viewModel: m1Runtime.homeViewModel,
+          debugAvailable: this.debugPackage,
+          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic),
+          onOpenDiagnostics: () => this.openDiagnostics(),
+          onPrefetch: (topicIds: number[]) => m1Runtime.prefetchTopics(topicIds),
+          onCancelPrefetch: () => m1Runtime.cancelPrefetch()
+        })
+      } else if (this.selectedTab === CommunityTab.Forums) {
+        ForumsPage({
+          viewModel: m1Runtime.forumViewModel,
+          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+        })
+      } else if (this.selectedTab === CommunityTab.Search) {
+        SearchPage({
+          viewModel: m1Runtime.searchViewModel,
+          authenticated: this.authenticated,
+          onLogin: () => this.requestHomeLogin(),
+          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+        })
+      } else {
+        ProfilePage({
+          sessionViewModel: m1Runtime.homeViewModel,
+          profileViewModel: m1Runtime.profileViewModel,
+          authenticated: this.authenticated,
+          onLogin: () => this.requestHomeLogin(),
+          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+        })
+      }
+
+      ImmersiveBottomTabBar({
+        selectedTab: this.selectedTab,
+        onSelect: (tab: CommunityTab) => { this.selectedTab = tab; },
+        onCompose: () => this.openComposer()
+      })
+    }
+    .width('100%').height('100%')
+    .backgroundColor(SemanticColors.page())
   }
 
   build() {
     Stack() {
       Navigation(this.pathStack) {
-        HomePage({
-          viewModel: m1Runtime.homeViewModel,
-          debugAvailable: this.debugPackage,
-          authenticated: this.authenticated,
-          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic),
-          onOpenDiagnostics: () => this.openDiagnostics(),
-          onLogin: () => this.requestHomeLogin(),
-          onPrefetch: (topicIds: number[]) => m1Runtime.prefetchTopics(topicIds),
-          onCancelPrefetch: () => m1Runtime.cancelPrefetch()
-        })
+        this.rootTabContent()
       }
       .hideTitleBar(true)
       .navDestination(this.pathMap)

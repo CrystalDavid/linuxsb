@@ -1,6 +1,20 @@
-import { HomeFeed, TopicSummary } from '../../models/HomeModels';
+import {
+  CurrentUserSummary,
+  FeedScope,
+  ForumSummary,
+  HomeFeed,
+  HomeFeedRequest,
+  TopicSummary
+} from '../../models/HomeModels';
+import { AuthSessionPort } from '../auth/AuthSession';
 import { ProductDecodePort } from '../protocol/ProductProtocolModels';
-import { ForumTransport, TransportCachePolicy, TransportErrorKind } from '../transport/ForumTransport';
+import {
+  ForumTransport,
+  TransportCachePolicy,
+  TransportErrorKind,
+  TransportProbeResponse
+} from '../transport/ForumTransport';
+import { ForumRouteBuilder } from '../transport/ForumRouteBuilder';
 import {
   HomeDataSourcePort,
   HomeLoadResult,
@@ -11,14 +25,39 @@ import {
 export class HomeRepository implements HomeDataSourcePort {
   private transport: ForumTransport;
   private decoder: ProductDecodePort;
+  private authSession: AuthSessionPort | undefined;
 
-  constructor(transport: ForumTransport, decoder: ProductDecodePort) {
+  constructor(transport: ForumTransport, decoder: ProductDecodePort, authSession?: AuthSessionPort) {
     this.transport = transport;
     this.decoder = decoder;
+    this.authSession = authSession;
   }
 
-  async loadHome(): Promise<HomeLoadResult> {
-    const response = await this.transport.getHome(TransportCachePolicy.Product);
+  async loadHome(request: HomeFeedRequest = HomeFeedRequest.home()): Promise<HomeLoadResult> {
+    const cookieHeader = this.authSession?.getRequestCookieHeader();
+    if (this.requiresAuthentication(request) && cookieHeader === undefined) {
+      return {
+        ok: false,
+        failure: { kind: RepositoryFailureKind.Unauthorized, message: 'LOGIN_REQUIRED' },
+        diagnostics: {
+          statusCode: 0,
+          networkMs: 0,
+          parseMs: 0,
+          inputBytes: 0,
+          execution: ''
+        }
+      };
+    }
+    const shouldUseGeneric = this.transport.getFeedPage !== undefined &&
+      (request.scope !== FeedScope.Home || request.pageUrl.length > 0 || cookieHeader !== undefined ||
+        request.sort !== HomeFeedRequest.home().sort);
+    let response: TransportProbeResponse;
+    if (shouldUseGeneric && this.transport.getFeedPage !== undefined) {
+      response = await this.transport.getFeedPage(ForumRouteBuilder.feed(request), cookieHeader ?? '',
+        TransportCachePolicy.Product);
+    } else {
+      response = await this.transport.getHome(TransportCachePolicy.Product);
+    }
     const networkDiagnostics: RepositoryDiagnostics = {
       statusCode: response.metadata.statusCode,
       networkMs: response.metadata.elapsedMs,
@@ -81,11 +120,37 @@ export class HomeRepository implements HomeDataSourcePort {
         cardStatus: item.cardStatus
       });
     }
+    const forums: ForumSummary[] = [];
+    const decodedForums = decoded.document.forums ?? [];
+    for (let index = 0; index < decodedForums.length; index++) {
+      forums.push({ forumId: decodedForums[index].forumId, name: decodedForums[index].name });
+    }
+    let currentUser: CurrentUserSummary | undefined = undefined;
+    if (decoded.document.currentUser !== undefined) {
+      currentUser = {
+        userId: decoded.document.currentUser.userId,
+        name: decoded.document.currentUser.name,
+        avatarUrl: decoded.document.currentUser.avatarUrl,
+        groupName: decoded.document.currentUser.groupName,
+        points: decoded.document.currentUser.points,
+        bio: decoded.document.currentUser.bio
+      };
+    }
     const feed: HomeFeed = {
       protocolVersion: decoded.document.bbsVersion,
-      topics: topics
+      topics: topics,
+      forums: forums,
+      currentPage: decoded.document.currentPage ?? 1,
+      totalPages: decoded.document.totalPages ?? 1,
+      nextPageUrl: decoded.document.nextPageUrl ?? '',
+      currentUser: currentUser
     };
     return { ok: true, data: feed, diagnostics: diagnostics };
+  }
+
+  private requiresAuthentication(request: HomeFeedRequest): boolean {
+    return request.scope === FeedScope.Search || request.scope === FeedScope.UserTopics ||
+      request.scope === FeedScope.UserReplies;
   }
 
   private mapTransportFailure(kind: TransportErrorKind): RepositoryFailureKind {

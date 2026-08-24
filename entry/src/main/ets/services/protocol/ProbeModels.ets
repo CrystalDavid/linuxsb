@@ -3,6 +3,15 @@ export interface ForumProbeSummary {
   name: string;
 }
 
+export interface CurrentUserProbeSummary {
+  userId: number;
+  name: string;
+  avatarUrl: string;
+  groupName: string;
+  points: number;
+  bio: string;
+}
+
 export interface HomeTopicProbeSummary {
   topicId: number;
   title: string;
@@ -26,6 +35,10 @@ export interface HomeProbeResult {
   bbsVersion: string;
   forums: ForumProbeSummary[];
   topics: HomeTopicProbeSummary[];
+  currentPage?: number;
+  totalPages?: number;
+  nextPageUrl?: string;
+  currentUser?: CurrentUserProbeSummary;
   warnings: string[];
 }
 

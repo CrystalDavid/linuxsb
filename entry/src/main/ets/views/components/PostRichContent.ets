@@ -9,6 +9,8 @@ struct PostImageBlock {
   semanticId: string = 'post-image';
   @State private loaded: boolean = false;
   @State private failed: boolean = false;
+  @State private requested: boolean = false;
+  @State private imageAspectRatio: number = 16 / 9;
 
   build() {
     if (this.failed) {
@@ -41,13 +43,16 @@ struct PostImageBlock {
       .onClick(() => {
         this.loaded = false;
         this.failed = false;
+        this.requested = true;
       })
     } else {
       Stack() {
-        if (!this.loaded) {
+        if (!this.requested || !this.loaded) {
           Column({ space: Spacing.SM }) {
-            LoadingProgress().width(24).height(24).color(SemanticColors.textSecondary())
-            Text('图片加载中')
+            if (this.requested) {
+              LoadingProgress().width(24).height(24).color(SemanticColors.textSecondary())
+            }
+            Text(this.requested ? '图片加载中' : '图片')
               .fontSize(Typography.LABEL_SMALL)
               .fontColor(SemanticColors.textTertiary())
           }
@@ -55,27 +60,39 @@ struct PostImageBlock {
           .height(112)
           .justifyContent(FlexAlign.Center)
         }
-        Image(this.url)
-          .id(this.semanticId)
-          .width('100%')
-          .constraintSize({ minHeight: this.loaded ? 1 : 112, maxHeight: PageMetrics.MEDIA_MAX_HEIGHT })
-          .objectFit(ImageFit.Contain)
-          .borderRadius(Radius.SM)
-          .draggable(false)
-          .accessibilityText(this.description.length > 0 ? this.description : '帖子图片')
-          .onAppear(() => TopicOpenTrace.markImageRequestsStart())
-          .onComplete(() => {
-            this.loaded = true;
-            TopicOpenTrace.markFirstImageFrame();
-          })
-          .onError(() => {
-            this.failed = true;
-          })
+        if (this.requested) {
+          Image(this.url)
+            .id(this.semanticId)
+            .width('100%')
+            .aspectRatio(this.imageAspectRatio)
+            .constraintSize({ minHeight: 112, maxHeight: PageMetrics.MEDIA_MAX_HEIGHT })
+            .objectFit(ImageFit.Contain)
+            .borderRadius(Radius.SM)
+            .draggable(false)
+            .accessibilityText(this.description.length > 0 ? this.description : '帖子图片')
+            .onAppear(() => TopicOpenTrace.markImageRequestsStart())
+            .onComplete((event) => {
+              if (event !== undefined && event.width > 0 && event.height > 0) {
+                this.imageAspectRatio = Math.max(0.55, Math.min(2.4, event.width / event.height));
+              }
+              this.loaded = true;
+              TopicOpenTrace.markFirstImageFrame();
+            })
+            .onError(() => {
+              this.failed = true;
+            })
+        }
       }
       .width('100%')
-      .constraintSize({ minHeight: this.loaded ? 1 : 112 })
+      .aspectRatio(this.imageAspectRatio)
+      .constraintSize({ minHeight: 112, maxHeight: PageMetrics.MEDIA_MAX_HEIGHT })
       .backgroundColor(SemanticColors.surfaceMuted())
       .borderRadius(Radius.SM)
+      .onVisibleAreaChange([0.0, 0.01], (isVisible: boolean, currentRatio: number) => {
+        if (isVisible && currentRatio > 0 && !this.requested) {
+          this.requested = true;
+        }
+      })
     }
   }
 }
@@ -89,16 +106,17 @@ export struct PostRichContent {
   private blockView(block: ContentBlock) {
     if (block.kind === ContentBlockKind.Paragraph) {
       Text(block.text)
-        .fontSize(16).lineHeight(26)
+        .fontSize(Typography.BODY).lineHeight(Typography.READING_LINE_HEIGHT)
         .fontColor(SemanticColors.textPrimary()).width('100%').copyOption(CopyOptions.LocalDevice)
     } else if (block.kind === ContentBlockKind.Heading) {
       Text(block.text)
-        .fontSize(19).lineHeight(27).fontWeight(FontWeight.Bold)
+        .fontSize(Typography.TITLE_SMALL).lineHeight(26).fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary()).width('100%').copyOption(CopyOptions.LocalDevice)
     } else if (block.kind === ContentBlockKind.ListItem) {
       Row({ space: 8 }) {
-        Text('•').fontSize(18).fontColor(SemanticColors.textSecondary())
-        Text(block.text).fontSize(16).lineHeight(26).fontColor(SemanticColors.textPrimary())
+        Text('•').fontSize(Typography.BODY_LARGE).fontColor(SemanticColors.textSecondary())
+        Text(block.text).fontSize(Typography.BODY).lineHeight(Typography.READING_LINE_HEIGHT)
+          .fontColor(SemanticColors.textPrimary())
           .layoutWeight(1).copyOption(CopyOptions.LocalDevice)
       }
       .width('100%')

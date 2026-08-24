@@ -1,4 +1,4 @@
-import { HomeFeed } from '../../models/HomeModels';
+import { HomeFeed, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicDetail } from '../../models/TopicModels';
 
 export enum RepositoryFailureKind {
@@ -40,7 +40,7 @@ export interface TopicLoadResult {
 }
 
 export interface HomeDataSourcePort {
-  loadHome(): Promise<HomeLoadResult>;
+  loadHome(request?: HomeFeedRequest): Promise<HomeLoadResult>;
 }
 
 export interface TopicDataSourcePort {

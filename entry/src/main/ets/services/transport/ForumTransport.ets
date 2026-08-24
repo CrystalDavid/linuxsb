@@ -35,6 +35,15 @@ export interface TransportProbeResponse {
   error?: TransportProbeError;
 }
 
+export class ForumFormFields {
+  _csrf: string = '';
+  id?: number;
+  forum_id?: number;
+  title?: string;
+  body?: string;
+  topic_id?: number;
+}
+
 export enum TransportCachePolicy {
   Product = 'Product',
   ProbeNoStore = 'ProbeNoStore'
@@ -42,6 +51,8 @@ export enum TransportCachePolicy {
 
 export interface ForumTransport {
   getHome(cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
+  getFeedPage?(pageUrl: string, cookieHeader?: string,
+    cachePolicy?: TransportCachePolicy): Promise<TransportProbeResponse>;
   getTopic(topicId: number, cachePolicy?: TransportCachePolicy,
     allowConditional?: boolean): Promise<TransportProbeResponse>;
   getAuthenticatedTopic(topicId: number, cookieHeader: string,
@@ -51,6 +62,8 @@ export interface ForumTransport {
   getAuthenticatedTopicPage?(topicId: number, pageUrl: string, cookieHeader: string,
     cachePolicy?: TransportCachePolicy, allowConditional?: boolean): Promise<TransportProbeResponse>;
   getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse>;
+  postForm?(pageUrl: string, fields: ForumFormFields,
+    cookieHeader: string): Promise<TransportProbeResponse>;
   cancelAll(): void;
   close(): void;
 }

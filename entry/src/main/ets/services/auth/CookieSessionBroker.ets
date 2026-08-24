@@ -43,6 +43,15 @@ export class CookieSessionBroker {
     return this.requestCookieHeader.length === 0 ? undefined : this.requestCookieHeader;
   }
 
+  getCsrfToken(): string | undefined {
+    const pair = this.findCookiePair(this.requestCookieHeader, 'bbs_csrf');
+    const equals = pair.indexOf('=');
+    if (equals < 0 || equals + 1 >= pair.length) {
+      return undefined;
+    }
+    return pair.substring(equals + 1);
+  }
+
   clearMemory(): void {
     this.requestCookieHeader = '';
   }

@@ -36,8 +36,6 @@ export struct UserAvatar {
           .onError(() => {
             this.imageFailed = true;
           })
-      } else {
-        this.fallback()
       }
     }
     .id(this.semanticId)

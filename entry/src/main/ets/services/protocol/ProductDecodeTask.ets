@@ -3,7 +3,9 @@ import { HomeProbeDecoder } from './HomeProbeDecoder';
 import {
   HomeProductDecodeResult,
   HomeProtocolDocument,
+  HomeProtocolForum,
   HomeProtocolTopic,
+  HomeProtocolUser,
   ProductDecodePort,
   TopicProductDecodeResult,
   TopicProtocolDocument,
@@ -28,6 +30,7 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
   if (kind === 'home') {
     const decoded = new HomeProbeDecoder().decode(html);
     const topics: HomeProtocolTopic[] = [];
+    const forums: HomeProtocolForum[] = [];
     for (let index = 0; index < decoded.topics.length; index++) {
       const item = decoded.topics[index];
       topics.push({
@@ -48,16 +51,36 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
         cardStatus: item.cardStatus
       });
     }
+    for (let index = 0; index < decoded.forums.length; index++) {
+      forums.push({ forumId: decoded.forums[index].forumId, name: decoded.forums[index].name });
+    }
+    let currentUser: HomeProtocolUser | undefined = undefined;
+    if (decoded.currentUser !== undefined) {
+      currentUser = {
+        userId: decoded.currentUser.userId,
+        name: decoded.currentUser.name,
+        avatarUrl: decoded.currentUser.avatarUrl,
+        groupName: decoded.currentUser.groupName,
+        points: decoded.currentUser.points,
+        bio: decoded.currentUser.bio
+      };
+    }
+    const home: HomeProtocolDocument = {
+      protocolMatched: decoded.protocolMatched,
+      bbsVersion: decoded.bbsVersion,
+      forums: forums,
+      topics: topics,
+      currentPage: decoded.currentPage,
+      totalPages: decoded.totalPages,
+      nextPageUrl: decoded.nextPageUrl,
+      currentUser: currentUser,
+      warnings: decoded.warnings
+    };
     const wire: ProductDecodeWireResult = {
       kind: 'home',
       parseMs: Date.now() - startedAt,
       inputBytes: inputBytes,
-      home: {
-        protocolMatched: decoded.protocolMatched,
-        bbsVersion: decoded.bbsVersion,
-        topics: topics,
-        warnings: decoded.warnings
-      }
+      home: home
     };
     return JSON.stringify(wire);
   }

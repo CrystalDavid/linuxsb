@@ -174,4 +174,12 @@ export class TopicDetailViewModel {
       await this.refreshFromSource(returnTopicId, true, generation, preserveContent, true);
     }
   }
+
+  async refreshAfterWrite(): Promise<void> {
+    if (this.topicId <= 0) {
+      return;
+    }
+    const generation = ++this.generation;
+    await this.refreshFromSource(this.topicId, true, generation, this.presentationDetail !== undefined, true);
+  }
 }

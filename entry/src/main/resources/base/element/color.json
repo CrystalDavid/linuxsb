@@ -119,6 +119,22 @@
     {
       "name": "immersive_input_field_bg",
       "value": "#FFF0F3F7"
+    },
+    {
+      "name": "bottom_tab_bar_bg",
+      "value": "#EFFFFFFF"
+    },
+    {
+      "name": "bottom_tab_bar_highlight",
+      "value": "#BFFFFFFF"
+    },
+    {
+      "name": "bottom_tab_bar_shadow",
+      "value": "#260A2A5A"
+    },
+    {
+      "name": "brand_primary_bright",
+      "value": "#FF3D8BFF"
     }
   ]
 }

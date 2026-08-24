@@ -12,7 +12,10 @@ $sourceFiles = Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Filter '*.
 
 foreach ($file in $sourceFiles) {
   $fullPath = $file.FullName
-  $relativePath = [System.IO.Path]::GetRelativePath($projectRoot, $fullPath)
+  $relativePath = $fullPath.Substring($projectRoot.Length)
+  while ($relativePath.StartsWith('\') -or $relativePath.StartsWith('/')) {
+    $relativePath = $relativePath.Substring(1)
+  }
   $lines = Get-Content -LiteralPath $fullPath
 
   for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {

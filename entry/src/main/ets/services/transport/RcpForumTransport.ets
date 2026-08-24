@@ -2,6 +2,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import {
   ForumTransport,
+  ForumFormFields,
   TransportCachePolicy,
   TransportErrorKind,
   TransportProbeError,
@@ -26,6 +27,11 @@ export class RcpForumTransport implements ForumTransport {
 
   async getHome(cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
     return this.get(`${FORUM_ORIGIN}/`, '', cachePolicy);
+  }
+
+  async getFeedPage(pageUrl: string, cookieHeader: string = '',
+    cachePolicy: TransportCachePolicy = TransportCachePolicy.Product): Promise<TransportProbeResponse> {
+    return this.get(this.validatedFeedUrl(pageUrl), cookieHeader, cachePolicy);
   }
 
   async getTopic(topicId: number,
@@ -194,12 +200,133 @@ export class RcpForumTransport implements ForumTransport {
     }
   }
 
+  async postForm(pageUrl: string, fields: ForumFormFields,
+    cookieHeader: string): Promise<TransportProbeResponse> {
+    const url = this.validatedWriteUrl(pageUrl);
+    const startedAt = Date.now();
+    const session = this.ensureSession();
+    if (session === undefined) {
+      return this.failedResponse(url, startedAt, 'UNKNOWN', 0, 'Unable to create the RCP session.');
+    }
+    const headers: rcp.RequestHeaders = {
+      'accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.5',
+      'user-agent': PRODUCT_USER_AGENT,
+      'origin': FORUM_ORIGIN,
+      'referer': `${FORUM_ORIGIN}/`
+    };
+    if (cookieHeader.length > 0) {
+      headers['cookie'] = cookieHeader;
+    }
+    let form: rcp.Form;
+    if (fields.topic_id !== undefined) {
+      form = new rcp.Form({
+        '_csrf': fields._csrf,
+        'topic_id': fields.topic_id,
+        'body': fields.body ?? ''
+      });
+    } else {
+      form = new rcp.Form({
+        '_csrf': fields._csrf,
+        'id': fields.id ?? 0,
+        'forum_id': fields.forum_id ?? 0,
+        'title': fields.title ?? '',
+        'body': fields.body ?? ''
+      });
+    }
+    const request = new rcp.Request(url, 'POST', headers, form);
+    request.destination = 'array-buffer';
+    this.activeRequests.push(request);
+    try {
+      const response = await session.fetch(request);
+      const body = response.toString();
+      const metadata: TransportProbeMetadata = {
+        statusCode: response.statusCode,
+        byteLength: response.body?.byteLength ?? 0,
+        contentType: this.headerValue(response.headers['content-type']),
+        contentEncoding: this.headerValue(response.headers['content-encoding']),
+        elapsedMs: Date.now() - startedAt,
+        effectiveUrl: response.effectiveUrl?.toString() ?? url,
+        sha256: ResponseFingerprint.sha256Hex(response.body)
+      };
+      if (body === null) {
+        return { metadata: metadata, body: '', error: { kind: 'BODY_DECODE', code: 0,
+          message: 'Response body is not valid UTF-8.' } };
+      }
+      return { metadata: metadata, body: body,
+        error: this.classifyResponse(response.statusCode, metadata.contentType) };
+    } catch (error) {
+      const classified = this.classifyException(error as BusinessError);
+      return this.failedResponse(url, startedAt, classified.kind, classified.code, classified.message);
+    } finally {
+      const requestIndex = this.activeRequests.indexOf(request);
+      if (requestIndex >= 0) {
+        this.activeRequests.splice(requestIndex, 1);
+      }
+    }
+  }
+
   private validatedTopicPageUrl(topicId: number, pageUrl: string): string {
     const canonical = `${FORUM_ORIGIN}/topic/${topicId}`;
     if (pageUrl === canonical || pageUrl.startsWith(`${canonical}?`)) {
       return pageUrl;
     }
     return canonical;
+  }
+
+  private validatedFeedUrl(pageUrl: string): string {
+    if (!pageUrl.startsWith(`${FORUM_ORIGIN}/`)) {
+      return `${FORUM_ORIGIN}/`;
+    }
+    const relative = pageUrl.substring(FORUM_ORIGIN.length);
+    if (relative === '/' || relative.startsWith('/?') || relative.startsWith('/index.php?')) {
+      return pageUrl;
+    }
+    if (this.isNumericRoute(relative, '/forum/') || this.isNumericRoute(relative, '/user/')) {
+      return pageUrl;
+    }
+    return `${FORUM_ORIGIN}/`;
+  }
+
+  private validatedWriteUrl(pageUrl: string): string {
+    if (pageUrl === `${FORUM_ORIGIN}/topic_edit` || pageUrl === `${FORUM_ORIGIN}/reply_edit`) {
+      return pageUrl;
+    }
+    return `${FORUM_ORIGIN}/`;
+  }
+
+  private failedResponse(url: string, startedAt: number, kind: TransportErrorKind,
+    code: number, message: string): TransportProbeResponse {
+    return {
+      metadata: {
+        statusCode: 0,
+        byteLength: 0,
+        contentType: '',
+        contentEncoding: '',
+        elapsedMs: Date.now() - startedAt,
+        effectiveUrl: url,
+        sha256: ''
+      },
+      body: '',
+      error: { kind: kind, code: code, message: message }
+    };
+  }
+
+  private isNumericRoute(relative: string, prefix: string): boolean {
+    if (!relative.startsWith(prefix)) {
+      return false;
+    }
+    let cursor = prefix.length;
+    let digitCount = 0;
+    while (cursor < relative.length) {
+      const current = relative.charAt(cursor);
+      if (current < '0' || current > '9') {
+        break;
+      }
+      digitCount++;
+      cursor++;
+    }
+    return digitCount > 0 && (cursor === relative.length || relative.charAt(cursor) === '?');
   }
 
   private ensureSession(): rcp.Session | undefined {

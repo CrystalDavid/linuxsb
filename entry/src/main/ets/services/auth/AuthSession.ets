@@ -2,6 +2,7 @@ import { CookieProbeSummary, CookieSessionBroker, cookieSessionBroker } from './
 
 export interface AuthSessionPort {
   getRequestCookieHeader(): string | undefined;
+  getCsrfToken?(): string | undefined;
   captureOfficialLogin(): boolean;
   clearMemory(): void;
 }
@@ -15,6 +16,10 @@ export class AuthSession implements AuthSessionPort {
 
   getRequestCookieHeader(): string | undefined {
     return this.broker.getRequestCookieHeader();
+  }
+
+  getCsrfToken(): string | undefined {
+    return this.broker.getCsrfToken();
   }
 
   captureOfficialLogin(): boolean {

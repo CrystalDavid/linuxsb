@@ -1,145 +1,82 @@
-# Codex Instructions — 烧饼社区 M2-R1.1 分页回复、原生详情、抽屉与性能修复
+# Codex Instructions — 烧饼社区 M3 原生社区壳与交互闭环
 
 ## 当前唯一任务
 
-在不改变已验证业务架构的前提下，修复 M2-R1 遗留的分页、原生主题详情、ArkDO 抽屉高保真和主题打开性能问题：
+在不推翻 P0、P0-B 和 M1 已验证架构的前提下，完成简约、蓝色、纯 ArkUI 的社区主流程：
 
 ```text
-登录后主题 GET
-→ BBS1 v8.6.5 真实分页 href
-→ TopicReplyPage + TaskPool
-→ 原生 TopicDetailPage + 懒加载回复
-→ ArkDO 固定提交的授权抽屉/详情 UI
-→ 立即导航 + 骨架屏 + 缓存/去重/受控预取
+首页 / 板块 / 发布 / 搜索 / 我的
+  ↓
+真实列表、真实头像、连续分页
+  ↓
+原生主题详情、楼中楼、图片和简约回复栏
 ```
 
-所有结果严格使用 PASS、FAIL 或 NOT RUN。M2-R1 在本轮全部验收通过前继续保持 FAIL；M2-R1.1 完成后停止，不自行进入 M2-B、搜索、个人中心、通知或任何写操作。
+当前分支为 `codex/m3-native-community-shell`。下方 M2 的阶段结论已转入 `PROJECT_BASELINE.md` 作为历史；如与本文冲突，以本 M3 指令为准。
 
-## 开始工作前
+## 必须保持的架构
 
-1. 完整阅读 `PROJECT_BASELINE.md` 和冻结的 `P0_REPORT.md`。
-2. 检查工作树、分支、标签、签名隔离和忽略规则。
-3. 不打印、暂存、提交或覆盖本机签名密码、证书路径、Profile 路径、Cookie 值、账号、通知或私密正文。
-4. `P0_REPORT.md` 是冻结技术报告，不修改历史结论。
-5. 授权证据只由用户私下保存，不把聊天隐私或授权材料提交到 Git。
+- 正常业务：`RCP -> 版本化轻量解码 -> TaskPool -> 领域模型 -> PresentationMapper -> ArkUI`。
+- Page / Component 不直接解析 HTML、读 Cookie 或绕过 Repository 请求网络。
+- 不构建 DOM，不使用 CSS 选择器，不使用整页正则解码。
+- ArkWeb 只允许出现在 `OfficialLoginPage`，只用于 linux.sb 官方登录；其他页面 Web 节点必须为 0。
+- Cookie 只保留 `bbs_auth` / `bbs_csrf` 所需的内存 Header，不输出值，不写 Preferences 或文件。
+- 全局复用正式 `RcpForumTransport` / Session，主题页保留缓存、在途去重和立即导航。
 
-## 已冻结事实
+## UI 基线
 
-- P0、P0-B 与 M1 已在 API 26 真机通过。
-- M1 通过标签为 `m1-pass-api26-20260823`。
-- 只读主架构固定为：RCP GET → 版本化轻量解码 → TaskPool → ArkUI。
-- 登录固定为：临时 ArkWeb 官方登录 → Cookie 内存桥接 → RCP。
-- 登录后同一 `/topic/605` GET 稳定返回 5 条回复；不需要额外 GET、AJAX、POST 或 ArkWeb 数据桥。
-- P0-8 写操作为 NOT RUN；发帖、回复、编辑和删除继续固定禁用。
+- 底部为五位沉浸悬浮 Tab：`首页 / 板块 / + / 搜索 / 我的`。
+- 语义主色为蓝色；禁止绿色品牌色泄漏。
+- 主页不永久显示“非官方客户端”；身份说明保留在登录/关于等合适位置。
+- 列表使用 linux.sb 真实头像；只在缺失或加载失败时显示首字母回退。
+- 主楼、回复和楼中楼均为头像居左、作者/正文居右；使用克制的局部分隔，不还原网页容器和强分割线。
+- 图片使用原生 `Image` 可视区懒加载，不阻塞文字首帧；失败时可重试且不让页面停留 Loading。
+- 回复输入只使用简约线条和单一发送按钮。
+- 用户已确认获得 ArkDO 作者授权；可在授权范围内参考、移植和改造固定上游提交 `7680996437b3b877aa5c69ac2f55529297a2ea52`，但保留烧饼社区自己的品牌、协议模型和网络架构。
 
-## Git 与敏感信息边界
+## 数据与交互契约
 
-- 当前开发分支：`m2/r1-1-native-topic-drawer-perf`，从 M2-R1 失败基线提交 `891231c` 创建。
-- 分支基线：annotated tag `m1-pass-api26-20260823` 指向的 M1 稳定提交。
-- `main` 上已通过的 P0/P0-B/M1 历史和标签不得重写。
-- `build-profile.json5` 的本机签名版保持 `skip-worktree`，不得读取、暂存或提交。
-- `artifacts/`、日志、截图、Cookie、网页快照和签名材料不得进入公开提交。
-- UI 大改前必须保留仅含授权边界和基线修订的安全 checkpoint。
-- 不在 UI 提交中混入 RCP、协议解码、登录或 Cookie 架构重写。
+- 首页根据服务端真实 `p` 链接连续加载，不得再有 30 条客户端上限；合并时按 topicId 去重。
+- 板块页只展示服务端实际板块，选中后通过真实 `/forum/{id}` GET 筛选。
+- 搜索使用真实 GET 契约，尊重服务端登录门控，不伪造结果。
+- “我的”使用原生页面展示当前用户、主题和回复，不使用 ArkWeb 作业务容器。
+- 新主题只允许 POST `/topic_edit`，回复只允许 POST `/reply_edit`；字段必须匹配 BBS1 v8.6.5 真实表单契约。
+- 写请求必须同时拥有内存登录会话和 CSRF，且只能由用户在编辑页明确点击。自动测试只使用 fake transport，不得生成真实社区内容。
+- P0 报告中 `P0-8` 的历史结论继续为 `NOT RUN`；M3 的真实发帖/回复远程验收也保持 `NOT RUN`，直到用户明确提供测试内容并确认发送。
 
-## ArkDO 授权移植边界
+## 安全与 Git
 
-- 用户已确认获得 ArkDO 作者对源码学习、复用和改造的授权。
-- 允许直接读取、复制并改造 ArkDO UI 源码。
-- 唯一固定上游提交：`7680996437b3b877aa5c69ac2f55529297a2ea52`。
-- 本机上游目录优先使用 `C:\Code\ArkDO`；读取必须按固定提交对象完成，不依赖未提交工作树内容。
-- 允许移植主题、沉浸布局、浮动布局、列表项、头像、标签、筛选抽屉、详情阅读和禁用输入栏等表现层实现。
-- 保留“烧饼社区”自己的品牌、字段语义、BBS1 协议、RCP 网络、登录与 Cookie 架构。
-- 不迁入 ArkWebNetworkBridge、Challenge/Cloudflare、Discourse TopicService、MessageBus、Presence、Push、DoH、Boost、Reaction、Poll、LDC Credit 或 LinuxDO 等级/品牌逻辑。
-- 上游组件依赖 Discourse 模型时，必须通过 `TopicPresentationMapper` 和本项目自己的 `TopicUiModel`、`ReplyUiModel`、`UserUiModel`、`CategoryUiModel` 适配，不迁入 Discourse 业务模型。
+- 不打印、不提交、不覆盖 `build-profile.json5` 中的本机签名密码、证书路径或 Profile 路径。
+- 不提交 `artifacts/`、日志、截图、HTML 快照、Cookie 或签名材料。
+- 不修改 `P0_REPORT.md`历史结论。
+- 工作树中已有的用户修改不得丢失；提交前执行 `git diff --check` 和敏感文件检查。
 
-## M2-R1 页面范围
+## 测试与阶段门
 
-### 首页
+每次交付至少执行：
 
-- 删除巨大 Hero、“linux.sb · 只读浏览”、永久搜索框、巨大筛选胶囊、版块汉字头像、主题 ID 主信息和开发占位文案。
-- 使用紧凑顶部导航：菜单、烧饼社区、搜索图标、用户头像/未登录图标。
-- TopicListItem 优先显示真实头像；缺失时才使用作者首字母，不使用版块首字。
-- 标题最多两行，分类/状态标签与时间进入紧凑元信息层。
-- 保留 ArkDO 风格 FAB；点击只提示“写操作尚未开放”，不得发送 POST。
-- CategoryDrawer 只显示 linux.sb 真实支持的筛选和版块，不展示无数据支撑的假功能。
+- `hvigor test`；
+- `hvigor onDeviceTest`；
+- `hvigor assembleHap`；
+- `scripts/NoWebOutsideLogin.ps1`；
+- 模拟器 signed HAP 覆盖安装、启动、`dumpLayout` 与进程日志检查；
+- 里程碑最后再做 API 26 真机复验，不得把离线真机记为 PASS。
 
-### 主题详情
+安全日志硬性检查：Cookie 值泄露 0、`UI_FALLBACK` 0、Fatal 0、自动化真实 POST 0。
 
-- 移植并适配 TopicDetailHeader、TopicPostItem、PostRichContent、登录门控、回复项和 CommentInputBar 外观。
-- 匿名显示主楼和“登录后查看 N 条回复”；登录只打开临时官方 ArkWeb。
-- 登录完成后返回原主题并刷新；普通主题详情 Web 节点必须为 0。
-- CommentInputBar 固定禁用，不发送 POST。
-- 头像、正文图片和标签图标异步加载，失败不得阻塞正文或保持 Loading。
+## 当前状态（2026-08-25）
 
-## 数据与依赖边界
+- M3 五栏原生社区壳、蓝色语义主题、首页真实分页、板块筛选、搜索、个人页、发帖编辑器和原生回复栏：`PASS`（实现与模拟器验收）。
+- 主题详情原生排版、头像左/内容右、楼中楼层级、网页“展开全文”控件隔离和图片可视区懒加载：`PASS`。
+- 临时登录关闭顺序：`PASS`；先移除 ArkWeb，下一帧再抓取内存 Cookie 并刷新。手工复验 600ms 后 Profile 节点 1、Web 节点 0；设备自动回归同样通过。
+- 单元测试：`PASS`，86/86；模拟器设备测试：`PASS`，6/6。
+- `NoWebOutsideLogin`、已采样普通页面的 `dumpLayout` Web 0、signed HAP 构建/覆盖安装/启动：`PASS`。
+- 性能样本：点击到目的页约 9ms，Skeleton 约 26ms，含图主题首段文字约 968ms，TaskPool 解码约 14ms；首图受外部 CDN 影响约 5.06s，现已改为不阻塞正文的可视区懒加载。
+- 真实社区 POST：`NOT RUN`；测试期间未发帖、未回复。
+- API 26 真机本轮最终复验：`NOT RUN`；当前 HDC 真机目标为 Offline，不得宣称 M3 真机 PASS。
 
-- 在轻量 tokenizer/状态机内仅扩展真实且稳定的首页字段，不构建 DOM、不使用 CSS 计算或整页正则。
-- Page/Component 不直接发网络请求、不解析 HTML、不读取 Cookie。
-- Repository 不依赖 ArkUI；协议对象不得直接进入 UI。
-- 所有站点请求只经过 `ForumTransport`，正式实现只允许 `RcpForumTransport`。
-- ArkWeb 只允许出现在登录模块。
-- 数据不存在或无法稳定识别时隐藏字段，不伪造作者、头像、时间、回复数或状态。
+## 文档规则
 
-## 主题打开性能边界
-
-- Debug-only `TopicOpenTrace` 只记录时间点与阶段耗时，不记录 Cookie、HTML、私密正文或签名信息。
-- 点击列表后立即 push TopicDetailPage，不等待网络。
-- 首帧使用 TopicSummary 的已有字段和 ArkDO 风格正文骨架，不显示长期全屏旋转 Loading。
-- 全 App 复用一个正式 RcpForumTransport/Session；页面退出不得关闭全局 Session。
-- P0 探针可继续 no-cache/no-store，正式 TopicRepository 请求不得固定 no-store。
-- `TopicMemoryCache`：最近 20 个主题、TTL 2 分钟、命中立即显示并后台刷新；登录态变化时清理权限相关匿名缓存。
-- 同一 topicId + 同一认证状态只允许一个在途请求。
-- 不得每次打开主题都请求 `/notify`。
-- 首页稳定后最多并发 2 个、低优先级预取可见区域前 3 个公开主题；不得阻塞首页或预取权限未知页面。
-
-## Pura 90 验收
-
-- 默认目标为显式指定的 `127.0.0.1:55xx` Pura 90 模拟器，API 不低于 23。
-- 同时有多个设备时，每个 HDC 命令必须带 `-t`；目标不明确时停止。
-- 运行 `hvigor test`、`hvigor onDeviceTest`、`assembleHap`、signed HAP 覆盖安装和启动。
-- 检查进程日志、dumpLayout、浅色/深色截图和 ArkUI Inspector。
-- 目标：tap→页面首帧 ≤100 ms；缓存内容 ≤250 ms；冷请求正文 ≤1500 ms；同主题重复点击网络请求最多 1 个；TaskPool 解码约 ≤60 ms。
-- 网络超时必须与解码时间分开报告，且仍要保证立即导航和骨架首帧。
-
-## 禁止事项
-
-- 不发送 POST，不发帖、回复、编辑或删除；
-- 不新增常驻或隐藏 ArkWeb；
-- 不使用 ArkWeb 作为普通业务网络桥；
-- 不迁入被排除的 ArkDO 网络、服务和品牌模块；
-- 不绕过验证码、WAF、权限或限流；
-- 不缓存 Cookie、完整私密 HTML或登录后页面；
-- 不修改 `P0_REPORT.md`；
-- 不新建大量 M2-R1 文档。
-
-## 当前状态（2026-08-24）
-
-- M1 稳定基线与新分支：PASS。
-- ArkDO 固定提交及指定 UI 文件可读取：PASS。
-- 签名配置与 `artifacts/` 隔离：PASS。
-- M2-R1 授权边界文档 checkpoint：PASS。
-- M2-R1 授权 UI 移植、真实首页字段、Presentation Adapter、共享 Session、主题缓存、在途去重和受控预取：PASS。
-- Pura 90（API 24）功能、深浅色、语义 UI、signed HAP 安装启动与安全回归：PASS。
-- Pura 90 主题打开：页面/骨架首帧最大 44 ms、热缓存正文最大 51 ms、TaskPool 解码最大 16 ms：PASS；冷正文 1500 ms 目标为 3/5，另外两次由 1731/1827 ms 网络阶段导致：FAIL（已与解码耗时分开记录）。
-- M2-R1 API 26 真机 signed HAP 安装、启动、正式首页、匿名主题和临时官方登录：PASS；首页与普通主题页 Web 节点均为 0。
-- M2-R1 登录返回与认证会话桥接：PASS；临时 ArkWeb 关闭后返回原主题并发出认证 RCP GET，没有使用 ArkWeb 数据桥。
-- M2-R1 登录后回复视觉：PASS（Topic 15458）；页面声明 35 条回复，滚动视口语义节点连续显示楼层 1～4，登录门控 0、普通页面 Web 节点 0。
-- 真机进程重启会话隔离：PASS；重启后正式首页恢复，进入主题重新显示匿名登录门控，内存 RCP 会话没有持久化恢复。
-- 高回复主题兼容性：FAIL（Topic 15365）；认证 GET 成功返回后解码结果为 `REPLY_STRUCTURE_MISMATCH`。本轮不猜分页路由、不执行 POST，也不把协议修订混入 UI 里程碑。
-- 真机最终进程日志：PASS；783 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、HTTP POST 0。
-- DevEco ArkUI Inspector 交互检查：NOT RUN（本轮桌面窗口焦点不稳定）；已用 TestKit 与 `dumpLayout` 完成组件层级、空白、抽屉边界和普通页面 Web 节点检查。
-- M2-R1 历史状态：FAIL；冷正文目标、高回复主题兼容性未全部通过，ArkUI Inspector 为 NOT RUN。
-- M2-R1.1 分支、安全 checkpoint、签名隔离和 artifacts 忽略：PASS。
-- Topic 15365 分页协议修复：PASS；登录态结构探针确认真实下一页 href，第一页 50 条为合法引用树顺序，实时声明总数本次为 87，`REPLY_STRUCTURE_MISMATCH` 已消除。
-- 正文边界、引用父楼层、分页去重/幂等、批量挂载与可点击加载兜底：PASS；固定 75 = 50 + 25 fixture 与动态总数测试均通过。
-- 正文原生展示修复：PASS；网页折叠控件不进入正文，真实用户正文中的“展开全文”仍保留；懒加载、链接包裹和 `srcset` 图片进入原生 Image，图片异步加载且不阻塞文字。
-- 楼中楼原生表现：PASS（自动契约）；父楼层映射为有界 `threadDepth`，保持服务端引用树顺序并显示“楼中楼 · 回复 #N”。登录后真实 Topic 15365 最终 UI 仍随第二页复验一起验收。
-- 抽屉与品牌修复：PASS；主色由青色改为蓝色，删除“筛选”“版块”“最新”，仅保留“新评论 / 新帖子”；正式首页“非官方客户端”副标题保持删除。最新版 Pura 90 dumpLayout 为这些禁用文字 0、Home/Drawer Web 0。
-- 性能修复：PASS（自动契约）；修复不同主题复用 ViewModel 时的旧内容串页，同主题刷新保留现有内容；重复可见窗口预取被抑制，返回首页后可重新调度，缓存、在途请求去重、十条批量挂载和图片非阻塞继续生效。历史冷网络 1500 ms 指标仍按真实网络阶段单独记录，不伪装为解码耗时。
-- 自动测试与构建：PASS；`hvigor test` 71/71、`onDeviceTest` 5/5、`NoWebOutsideLogin`、signed HAP 构建、模拟器覆盖安装和启动均通过。
-- 模拟器进程与安全日志：PASS；最终 Home/Drawer dumpLayout Web 0，5 秒应用日志 7117 行中 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露匹配 0、POST 证据 0，生产源码 POST 命中 0。
-- 最新版登录后第二页 UI 合并复验：NOT RUN；最终覆盖安装后内存登录会话已按设计清空，等待用户重新完成官方登录。
-- DevEco ArkUI Inspector：PASS；已真实连接 `com.example.shaobingcommunity`，展开 `RootPage -> RootTabPage -> Navigation`，并在普通页面组件搜索中确认 `Web` 无匹配子节点。
-- 最终 API 26 真机复验：NOT RUN；M2-R1 总状态继续保持 FAIL，不创建 PASS 标签。
-- P0-8 真实写操作：NOT RUN；继续禁止 POST、发帖、回复、编辑和删除。
+- 只维护 `AGENTS.md`、`PROJECT_BASELINE.md` 和已冻结的 `P0_REPORT.md`，不新建成套阶段文档。
+- 本轮只更新 `AGENTS.md` 和 `PROJECT_BASELINE.md`；`P0_REPORT.md` 保持不变。
+- 所有验收结果严格使用 `PASS`、`FAIL` 或 `NOT RUN`，未执行真机或真实写入时不得补写 PASS。

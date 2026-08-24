@@ -8,9 +8,10 @@ import {
   requiresHdsLayoutSafeAreaAvoidance
 } from '../../common/ui/ImmersiveLightMaterial';
 import { SYS_BOTTOM_INSET_KEY, SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
-import { ReplyUiModel, TopicDetailUiModel, TopicUiModel } from '../../models/presentation/ForumUiModels';
+import { PostUiModel, ReplyUiModel, TopicDetailUiModel, TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { ReplyAccess } from '../../models/TopicModels';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
+import { WriteResult } from '../../services/repository/WriteRepository';
 import { TopicDetailViewModel } from '../../viewmodels/TopicDetailViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { CommentInputBar } from '../components/CommentInputBar';
@@ -25,11 +26,15 @@ export struct TopicDetailPage {
   @ObjectLink viewModel: TopicDetailViewModel;
   topicId: number = 0;
   summary: TopicUiModel | undefined = undefined;
+  @Prop authenticated: boolean = false;
   onBack: () => void = () => {};
   onLogin: () => void = () => {};
+  onReply: (body: string) => Promise<WriteResult> =
+    async () => ({ ok: false, topicId: 0, message: '回复服务不可用', networkMs: 0 });
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
   @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
   @State private summaryVisible: boolean = true;
+  @State private replyDraft: string = '';
   private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
@@ -51,14 +56,27 @@ export struct TopicDetailPage {
     return this.summary?.category.name ?? '';
   }
 
-  private showWriteUnavailable(): void {
+  private scrollToSummary(): void {
+    this.scroller.scrollToIndex(0, true, ScrollAlign.START);
+  }
+
+  private requestReplyTo(post: PostUiModel): void {
+    const name = post.author.displayName.trim();
+    this.replyDraft = name.length > 0 ? `@${name} #${post.floor} ` : `#${post.floor} `;
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '回复功能尚未开放', duration: 1800 });
+      focusControl.requestFocus('topic-reply-input');
     } catch (_) {}
   }
 
-  private scrollToSummary(): void {
-    this.scroller.scrollToIndex(0, true, ScrollAlign.START);
+  private async submitReply(body: string): Promise<WriteResult> {
+    return this.onReply(body);
+  }
+
+  private async handleReplySubmitted(): Promise<void> {
+    await this.viewModel.refreshAfterWrite();
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '回复已发表', duration: 1500 });
+    } catch (_) {}
   }
 
   @Builder
@@ -74,21 +92,19 @@ export struct TopicDetailPage {
   @Builder
   private replySectionHeader(detail: TopicDetailUiModel) {
     Row() {
-      Text(`${detail.loadedReplyCount} / ${detail.advertisedReplyCount} 条回复`)
-        .fontSize(16)
+      Text('回复')
+        .fontSize(Typography.BODY_LARGE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .layoutWeight(1)
-      if (detail.totalPages > 1) {
-        Text(`第 ${detail.currentPage} / ${detail.totalPages} 页`)
-          .fontSize(12)
-          .fontColor(SemanticColors.textSecondary())
-      }
+      Text(`${detail.loadedReplyCount} / ${detail.advertisedReplyCount}`)
+        .fontSize(Typography.CAPTION)
+        .fontColor(SemanticColors.textSecondary())
     }
     .id('topic-reply-summary')
     .width('100%')
-    .padding({ left: 10, right: 10, top: 16, bottom: 8 })
-    .backgroundColor(SemanticColors.page())
+    .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.LG, bottom: Spacing.SM })
+    .backgroundColor(SemanticColors.surface())
   }
 
   @Builder
@@ -158,7 +174,11 @@ export struct TopicDetailPage {
         ListItem() { this.replySectionHeader(detail) }
         ForEach(this.viewModel.visibleReplies(), (reply: ReplyUiModel) => {
           ListItem() {
-            TopicPostItem({ post: reply, mainPost: false })
+            TopicPostItem({
+              post: reply,
+              mainPost: false,
+              onReply: (post: PostUiModel) => this.requestReplyTo(post)
+            })
           }
         }, (reply: ReplyUiModel) => reply.postId.toString())
         ListItem() { this.loadMoreState(detail) }
@@ -201,7 +221,6 @@ export struct TopicDetailPage {
         .width('100%')
         .alignItems(HorizontalAlign.Start)
         .padding({ left: 10, right: 10, top: 20, bottom: 16 })
-        .border({ width: { bottom: 1 }, color: SemanticColors.divider() })
         .backgroundColor(SemanticColors.surface())
       }
       ListItem() {
@@ -283,7 +302,13 @@ export struct TopicDetailPage {
       .height('100%')
       .backgroundColor(Color.Transparent)
       .hitTestBehavior(HitTestMode.Transparent)
-      CommentInputBar({ onUnavailable: () => this.showWriteUnavailable() })
+      CommentInputBar({
+        draft: $replyDraft,
+        authenticated: this.authenticated,
+        onLogin: () => this.onLogin(),
+        onSubmit: (body: string) => this.submitReply(body),
+        onSubmitted: () => this.handleReplySubmitted()
+      })
     }
     .id('topic-detail-page')
     .width('100%')

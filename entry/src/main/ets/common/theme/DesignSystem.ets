@@ -90,6 +90,10 @@ export class PageMetrics {
   static readonly DRAWER_EDGE_WIDTH: number = 56;
   static readonly FAB_SIZE: number = 52;
   static readonly REPLY_BAR_HEIGHT: number = 68;
+  static readonly BOTTOM_TAB_BAR_HEIGHT: number = 70;
+  static readonly BOTTOM_TAB_BAR_MARGIN: number = 12;
+  static readonly BOTTOM_TAB_BAR_RADIUS: number = 28;
+  static readonly BOTTOM_TAB_BAR_CONTENT_INSET: number = 94;
   static readonly MEDIA_MAX_HEIGHT: number = 520;
   static readonly SKELETON_TITLE_HEIGHT: number = 16;
   static readonly SKELETON_META_HEIGHT: number = 12;

@@ -16,10 +16,29 @@ export interface HomeProtocolTopic {
   cardStatus?: string;
 }
 
+export interface HomeProtocolForum {
+  forumId: number;
+  name: string;
+}
+
+export interface HomeProtocolUser {
+  userId: number;
+  name: string;
+  avatarUrl: string;
+  groupName: string;
+  points: number;
+  bio: string;
+}
+
 export interface HomeProtocolDocument {
   protocolMatched: boolean;
   bbsVersion: string;
+  forums?: HomeProtocolForum[];
   topics: HomeProtocolTopic[];
+  currentPage?: number;
+  totalPages?: number;
+  nextPageUrl?: string;
+  currentUser?: HomeProtocolUser;
   warnings: string[];
 }
 
