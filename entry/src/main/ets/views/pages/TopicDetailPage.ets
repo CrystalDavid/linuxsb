@@ -85,6 +85,7 @@ export struct TopicDetailPage {
       summaryVisible: this.summaryVisible,
       title: this.displayTitle(),
       categoryName: this.displayCategory(),
+      onBack: () => this.onBack(),
       onTitleClick: () => this.scrollToSummary()
     })
   }
@@ -104,7 +105,7 @@ export struct TopicDetailPage {
     .id('topic-reply-summary')
     .width('100%')
     .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.LG, bottom: Spacing.SM })
-    .backgroundColor(SemanticColors.surface())
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -220,8 +221,8 @@ export struct TopicDetailPage {
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
-        .padding({ left: 10, right: 10, top: 20, bottom: 16 })
-        .backgroundColor(SemanticColors.surface())
+        .padding({ left: 10, right: 10, top: Spacing.XXS, bottom: 16 })
+        .backgroundColor(Color.Transparent)
       }
       ListItem() {
         Column({ space: 12 }) {
@@ -239,7 +240,7 @@ export struct TopicDetailPage {
         .width('100%')
         .alignItems(HorizontalAlign.Start)
         .padding({ left: 10, right: 10, top: 12, bottom: 20 })
-        .backgroundColor(SemanticColors.surface())
+        .backgroundColor(Color.Transparent)
       }
     }
     .id('topic-skeleton')
@@ -286,17 +287,13 @@ export struct TopicDetailPage {
         enableComponentSafeArea: requiresHdsComponentSafeArea(ImmersiveLightArea.TITLE_BAR),
         style: buildImmersiveTitleBarStyle(),
         content: {
-          backIcon: {
-            icon: $r('sys.symbol.chevron_left'),
-            label: '返回',
-            action: () => this.onBack()
-          },
           stackBuilder: () => { this.titleBarContent(); }
         }
       })
       .bindToScrollable([this.scroller])
       .titleMode(HdsNavigationTitleMode.MINI)
       .mode(NavigationMode.Stack)
+      .hideBackButton(true)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%')
       .height('100%')

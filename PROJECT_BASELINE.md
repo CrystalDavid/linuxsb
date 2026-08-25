@@ -2,7 +2,7 @@
 
 > 本文件合并产品定义、系统架构、UI 基线、工程目录、质量标准和技术决策。除非 P0 证据证明关键链路不可行，否则实现不得偏离本基线。
 
-> 阶段状态（2026-08-25）：P0、P0-B 与 M1 历史验收继续为 PASS，M2-R1 历史状态保持 FAIL。M3 已在 Pura 90 API 24 模拟器完成五栏原生社区壳、连续首页分页、板块筛选、搜索/个人页、原生发帖/回复 UI、主题重排版、楼中楼、图片懒加载与登录返回假死修复；86/86 单元测试和 6/6 设备测试为 PASS。M3 真实社区 POST 与本轮 API 26 真机复验为 NOT RUN，因此只能称为“模拟器验收候选”，不宣称整个 M3 真机 PASS。
+> 阶段状态（2026-08-26）：P0、P0-B 与 M1 历史验收继续为 PASS，M2-R1 历史状态保持 FAIL。M3 已在 Pura 90 API 24 模拟器完成四栏原生社区壳与首页独立 FAB、连续首页分页、板块筛选、搜索/个人页、原生发帖/回复 UI、主题重排版、楼中楼、图片懒加载、登录返回假死修复、全局单层轮廓保留玻璃、三档主题切换，以及单一鸿蒙原生底栏图标；91/91 单元测试和 11/11 设备测试为 PASS。M3 真实社区 POST 与本轮 API 26 真机复验为 NOT RUN，因此只能称为“模拟器验收候选”，不宣称整个 M3 真机 PASS。
 
 ## 1. 产品定义
 
@@ -175,21 +175,43 @@ M3 不改变已冻结的 RCP / 轻量解码 / TaskPool / ArkUI 架构，仅扩�
 
 | 项目 | 状态 | 核心证据 |
 | --- | --- | --- |
-| 五栏原生导航 | PASS | 底部为蓝色沉浸悬浮 `首页 / 板块 / + / 搜索 / 我的`；中央发布按钮独立强调；设备语义切换测试通过 |
+| 四栏原生导航与首页 FAB | PASS | 根壳使用 `HdsNavigation / HdsNavDestination / HdsTabs`；可见底栏只有 `首页 / 板块 / 搜索 / 我的`，发布入口位于首页可拖动 FAB。底栏固定为 56vp 鸿蒙高亮托盘和 64×50vp 连续移动指示器，按 72vp Tab 槽位精确居中，不再保留紧凑或 iOS 玻璃分支；Tab 默认状态层关闭，避免黑闪和双层轮廓。底栏图标只保留一套原生实现：板块、搜索、我的使用系统填充 `SymbolGlyph`，首页使用 ArkUI `Path` 按参考轮廓绘制并以 `vp2px` 适配密度；无图片与 SVG 图标资源。四枚图标位于相同 28×26vp 光学盒，保留各自原有轮廓、比例、字重和位移补偿，从自身中心统一乘以 0.92 的最终显示缩放，再统一下移 0.7vp；首页只将门洞下沿横梁由 1.55 继续加粗为 1.85 路径单位。模拟器 1320×2856 截图中四枚图标整体下移约 2px，与标签的可见间距缩短 2–3px，尺寸与水平位置不变；首页中心封口由 5px 增至 7px，屋顶、外墙与门洞圆弧边界不变。当前 `ImmersiveBottomTabBar.ets` 以 SHA-256 `C21D5B4C60E83415B2160EC0131D8A32917AD59091F283C27ED52D0FE3D101FE` 冻结并由脚本校验。首页 FAB 继续使用 23vp 系统加号，只将字重从 Bold 提高为 900；1320×2856 同区域像素测量中横/竖笔画由 8/9px 增至 11/11px，尺寸与位置不变 |
+| 沉浸光感材质 | PASS | 标题栏使用 HDS `GRADIENT_BLUR` 与能力探测后的系统材质；底栏、FAB、详情返回、分段控件、搜索/回复/发帖输入统一为一个 6vp `backgroundEffect` 采样层。全局默认使用 1.08 饱和度、1.12 亮度、约 1.25vp 白色高亮边缘和单圈中性阴影；浅色选中胶囊增加中性灰填充。重复背景、第二模糊层和旧式暗染色均已删除 |
+| 深浅色设置 | PASS | “我的”页通过可拖动的 6vp 单层玻璃齿轮 FAB 进入独立原生设置页；配置并持久化“跟随系统 / 浅色 / 深色”。旧双套底栏图标偏好、切换控件和四枚 SVG 已移除；设置内容锚定标题栏下方，个人主页不直接堆放外观控件 |
+| 普通组件 systemMaterial | NOT RUN | 当前工程 compile/target API 24；`uiMaterial.ImmersiveMaterial` 与 ArkUI `.systemMaterial()` 从 API 26 提供。本轮不伪造缺失类型，待升级 API 26 SDK 后接入 |
 | 首页连续分页 | PASS | 解码服务端真实 `p` href，去除 30 条客户端上限，`LazyForEach` 接近底部时加载下页并按 topicId 去重 |
-| 板块 | PASS | 原生板块页显示服务端真实名称，选中后请求真实 `/forum/{id}` GET；技术交流筛选已在模拟器可视验证 |
-| 搜索与个人页 | PASS | 原生 Search/Profile 页、标题/正文/回复搜索契约、当前用户与用户 feed 映射已实现；未登录门控不伪造数据 |
-| 主题详情排版 | PASS | 主楼/回复使用头像左、作者和正文右；楼中楼保留父楼层级；仅保留局部细分隔；普通页面 Web 节点 0 |
+| 首页顶栏密度 | PASS | 品牌标题由 20vp 提高到 22vp；“新评论 / 新帖子”切换使用 66vp 单项宽、36vp 高与 13vp 标签，仍在 Pura 90 单行标题栏内完整显示 |
+| 板块 | PASS | 首页板块标签按板块使用独立颜色；根目录展示 16vp 色标、真实名称、公开简介、主题数与进入箭头。板块名称以及首页/具体板块的主题标题由 17vp、500 调整为 16vp、400，元信息保持 13vp；进入单个板块后才请求真实 `/forum/{id}` GET 并显示主题流及统一的“新评论 / 新帖子”切换 |
+| 首页主题排版选择 | PASS | 设置页保留并持久化两种用户选项：“标题优先”为标题、标签、作者/回复/时间三行，默认启用；“作者优先”为头像旁作者与最近活跃时间/回复数、下方标题、末行标签。两种标题均为 17vp、500 字重；作者优先头像由 48vp 缩至 38vp。运行时切换会重建对应 `LazyForEach` 分支，模拟器已逐项切换截图；置顶/精华/热/抽奖中/卡片进行中/卡片已结束分别使用蓝/紫/红/粉/青/灰语义胶囊并适配深浅主题；板块、搜索和个人页仍保持原紧凑结构。数据模型未提供首帖发布时间，因此作者优先只显示真实 `lastReplyAt`，不伪造字段 |
+| 搜索与个人页 | PASS | 原生 Search/Profile 页、标题/正文/回复搜索契约、当前用户与用户 feed 映射已实现；未登录页删除中间解释段，只保留“登录后搜索 / 登录后查看个人主页”和官方登录动作；搜索箭头与官方登录 CTA 已移除纯色填充并统一为 6vp 单层玻璃 |
+| 主题详情排版 | PASS | 主楼/回复使用头像左、作者和正文右；楼中楼保留父楼层级；详情摘要、正文和回复移除独立 surface，仅保留低对比细分隔；详情与发表主题页共用 40vp 单层玻璃返回按钮，内部 `chevron_left` 为 28vp/700；摘要顶部内边距由最初 20vp 收至 4vp，使主题标题累计上移 16vp，骨架首帧同步；帖子内“回复”动作使用 Capsule、圆角与 clip，点击不再闪出矩形状态层；普通页面 Web 节点 0 |
 | 正文与图片 | PASS | 网页“展开全文”等控件不进入 ContentBlock；原生 Image 成功显示外部 WebP；改为可视区懒加载，不阻塞文字 |
-| 发帖与回复实现 | PASS | 原生编辑器和简约回复栏已接入 `WriteRepository`；Transport 仅 allowlist `/topic_edit` 和 `/reply_edit`；单元测试仅用 fake transport 校验字段 |
+| 发帖与回复实现 | PASS | 原生编辑器和简约回复栏已接入 `WriteRepository`；回复输入已删除左侧编辑图标及其预留空白，输入外层与发送按钮统一为 44vp 高，发送端复用单层液态玻璃并保留 36vp/700 的系统 `arrow_up_circle_fill`。发表主题页未登录时不渲染发布、板块、标题和正文控件，仅显示无外框登录门禁；门禁通过顶部锚定布局固定在标题栏正文区域起点 12vp 内，不再因短内容落到页面中下部。登录后显示 40vp 圆润玻璃发布按钮及包含全部真实板块的两列网格。Transport 仅 allowlist `/topic_edit` 和 `/reply_edit`；单元测试仅用 fake transport 校验字段 |
 | 真实社区 POST | NOT RUN | 未自动发帖或回复，没有为验收创造社区垃圾内容；P0-8 历史状态不变 |
-| 登录完成返回 | PASS | 关闭时先从 UI 移除临时 ArkWeb，下一帧再抓取 Cookie/刷新；手工复验 600ms 后 Profile=1、Web=0，专项设备测试通过 |
-| 性能样本 | PASS | 含图主题 destination 约 9ms、Skeleton 约 26ms、首段文字约 968ms、TaskPool 约 14ms；首图约 5.06s 的外部 CDN 阶段不再阻塞正文 |
-| 自动测试 | PASS | `hvigor test` 86/86；`hvigor onDeviceTest` 6/6；`NoWebOutsideLogin` PASS；已采样 12 份普通页面 layout 中 Web/网页控件文字匹配为 0 |
-| 模拟器 signed HAP | PASS | Pura 90 API 24 构建、覆盖安装、启动与最终 Home `dumpLayout` 成功 |
-| API 26 真机最终复验 | NOT RUN | HDC 真机目标当前为 Offline；待重连后再验证登录态 Search/Profile、回复翻页和用户手动写入 |
+| 登录完成返回 | PASS | 官方登录原生头部读取系统顶部安全区，标题和“完成并返回”整体避开状态栏/挖孔区，旧“临时网页登录……”说明已删除；关闭时先从 UI 移除临时 ArkWeb，下一帧再抓取 Cookie/刷新；手工复验 600ms 后 Profile=1、Web=0，专项设备测试通过 |
+| 性能样本 | PASS | 含图主题 destination 约 9ms、Skeleton 约 26ms、首段文字约 968ms、TaskPool 约 14ms；首图约 5.06s 的外部 CDN 阶段不再阻塞正文。首页 FAB 改为帧边界合并位移、移除逐事件缩放并将识别阈值降至 1vp；Pura 90 RenderService 实际拖动记录中 >16.67ms、>33ms、>66ms 卡顿均为 0 |
+| 自动测试 | PASS | `hvigor test` 91/91；`hvigor onDeviceTest` 11/11；设备回归覆盖四栏居中、四枚单一原生图标和旧矢量节点为 0、单一鸿蒙高亮底栏、液态拖动指示器、可拖动 FAB、System/Light/Dark、板块、编辑器、登录关闭与原生详情，并新增发帖门禁距正文顶部不超过 16vp、官方登录标题/完成按钮避开顶部安全区的像素边界断言 |
+| 模拟器 signed HAP | PASS | Pura 90 API 24 构建、覆盖安装、启动成功；最终 Home `dumpLayout` Web 0，进程 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露 0、HTTP POST 0；全局 6vp 单层玻璃已截图复验，控件内文字不再与底层内容抢读 |
+| API 26 真机最终复验 | NOT RUN | HDC 重启后只发现 `127.0.0.1:5555` 模拟器，Windows 未枚举 HDC Interface；待手机重新建立 HDC 连接后再安装复验，不能用模拟器结果代替 |
 
 M3 当前是已通过模拟器的候选版。在 API 26 真机重连且完成最终复验前，不将整个 M3 宣称为 PASS；真实发帖/回复只能由用户在 App 中明确确认。
+
+### 2.9 原生性审计（2026-08-26）
+
+本节把“鸿蒙原生组件”“外部内容”和“网页界面”分开判断，避免把网络图片或 HTML 数据源误判成网页套壳。
+
+| 审计范围 | 结论 | 代码证据与边界 |
+| --- | --- | --- |
+| 正式页面与导航 | 原生 | Home、Forums、Search、Profile、Settings、Compose、TopicDetail 均由 ArkUI 和 UI Design Kit 构建；根壳使用 `HdsNavigation / HdsTabs`，普通页面 `Web` 节点为 0 |
+| 底栏与操作图标 | 原生 | 三枚系统 `SymbolGlyph` 加一枚 ArkUI `Path` 首页图标；不存在 SVG、HTML 或位图 Tab 图标。`Path` 是原生绘制，但首页字形并非系统内置 Symbol |
+| 玻璃与沉浸材质 | 原生 ArkUI | HDS 标题栏配合能力探测，普通控件使用 ArkUI `backgroundEffect`。工程 target API 24，因此 API 26 才提供的普通组件 `.systemMaterial()` 仍为 `NOT RUN`；这表示“不是该 API 26 系统材质原语”，不表示使用了网页或跨端渲染 |
+| 网络与协议转换 | 原生执行 | 唯一正式 Transport 为 Remote Communication Kit；BBS1 HTML 在 TaskPool 中由版本化单遍状态机解码，不构建 DOM/CSSOM、不执行网页脚本、不使用 ArkWeb 网络桥 |
+| 头像与帖子图片 | 原生组件 + 外部媒体 | URL 来自 linux.sb/CDN，但显示组件是 ArkUI `Image`，使用原生懒加载与失败回退；外部图片内容本身不等于非原生页面 |
+| 官方登录正文 | **唯一非 ArkUI 可见内容** | `OfficialLoginPage.ets` 中唯一一个 `Web` 节点加载 `https://linux.sb/login`；其头部与关闭按钮仍为 ArkUI。此临时网页只负责官方账号登录，关闭后销毁 |
+| Cookie 衔接 | 平台原生服务，非可见 UI | `CookieSessionBroker.ets` 调用 ArkWeb `WebCookieManager` 读取必要 Cookie，并只在内存中交给 RCP；它不创建页面 |
+| 运行时第三方框架 | 无 | `oh-package.json5` 与 `entry/oh-package.json5` 的运行时 dependencies 为空；无 React Native、Flutter、uni-app、Cordova、axios 或自带 WebView 套壳 |
+
+源码门禁 `scripts/NoWebOutsideLogin.ps1` 已通过：ArkWeb import 仅位于 `services/auth`，`Web` 构造器仅位于 `OfficialLoginPage.ets`。因此，若把“原生”定义为“全部可见内容均为 ArkUI”，当前唯一例外就是官方登录网页；若把“原生”定义为“使用 HarmonyOS 平台组件”，ArkWeb 本身也是系统组件，但其中呈现的站点登录正文仍然是网页而非 ArkUI。
 
 ## 3. 协议适配原则
 
@@ -327,7 +349,7 @@ entry/src/ohosTest/              设备集成测试
 - 登录页只加载受信任的 `https://linux.sb/` 域名，外链转系统浏览器；
 - Cookie 仅在必要时驻留内存；
 - P0 默认禁止真实 POST；
-- 不修改、提交或生成真实签名证书、Profile、私钥与密码；
+- 可共享 `build-profile.json5` 不保存开发机证书路径、Profile 路径、keystore 路径或密码；本地签名只在 DevEco Studio/开发机配置，不提交真实签名证书、Profile、私钥与密码；
 - 不绕过验证码、人机验证、站点权限或限流。
 
 ### 6.3 质量目标

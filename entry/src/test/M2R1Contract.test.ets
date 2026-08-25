@@ -397,14 +397,14 @@ export default function m2r1ContractTest() {
       expect(viewModel.presentationDetail?.title).assertEqual('Refreshed topic');
     });
 
-    it('renders a warm cache synchronously and revalidates in the background', 0, async () => {
+    it('renders a warm cache synchronously without forcing a fresh network request', 0, async () => {
       const source = new SingleTopicSource();
       source.cached = detail(605, 'Cached');
       source.result = { ok: true, data: detail(605, 'Revalidated'), diagnostics: emptyDiagnostics() };
       const viewModel = new TopicDetailViewModel(source);
       await viewModel.open(605, undefined);
       expect(source.requestedIds.length).assertEqual(1);
-      expect(source.forceRefreshes[0]).assertTrue();
+      expect(source.forceRefreshes[0]).assertFalse();
       expect(viewModel.state).assertEqual(ViewLoadState.Content);
       expect(viewModel.detail?.title).assertEqual('Revalidated');
     });

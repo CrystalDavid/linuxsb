@@ -98,7 +98,7 @@ export struct TopicPostItem {
       if (!this.mainPost) {
         Row() {
           Blank()
-          Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Button({ type: ButtonType.Capsule, stateEffect: true }) {
             Row({ space: Spacing.XXS }) {
               SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
                 .fontSize(15)
@@ -110,7 +110,10 @@ export struct TopicPostItem {
           }
           .id(`reply-action-${this.post.floor}`)
           .height(30)
+          .padding({ left: Spacing.SM, right: Spacing.SM })
           .backgroundColor(Color.Transparent)
+          .borderRadius(Radius.PILL)
+          .clip(true)
           .onClick(() => this.onReply(this.post))
         }
         .width('100%')
@@ -142,7 +145,7 @@ export struct TopicPostItem {
 
       if (!this.isThreadedReply()) {
         Divider()
-          .strokeWidth(0.5)
+          .strokeWidth(0.35)
           .color(SemanticColors.divider())
           .margin({ left: Spacing.LG + this.avatarSize() + Spacing.MD, right: Spacing.LG })
       }
@@ -151,7 +154,7 @@ export struct TopicPostItem {
     .width(`calc(100% - ${this.horizontalInset()}vp)`)
     .margin({ left: this.horizontalInset(), right: this.isThreadedReply() ? Spacing.LG : 0,
       top: this.isThreadedReply() ? Spacing.XS : 0, bottom: this.isThreadedReply() ? Spacing.XS : 0 })
-    .backgroundColor(this.isThreadedReply() ? SemanticColors.surfaceMuted() : SemanticColors.surface())
-    .borderRadius(this.isThreadedReply() ? Radius.MD : 0)
+    .backgroundColor(Color.Transparent)
+    .borderRadius(0)
   }
 }

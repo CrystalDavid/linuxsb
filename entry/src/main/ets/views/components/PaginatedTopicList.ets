@@ -1,4 +1,5 @@
 import { PageMetrics, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { TopicListLayoutVariant } from '../../common/theme/TopicListStylePrefs';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
@@ -14,6 +15,7 @@ export struct PaginatedTopicList {
   emptyTitle: string = '暂无主题';
   onTopicSelected: (topic: TopicUiModel) => void = () => {};
   onRetry: () => void = () => {};
+  layoutVariant: TopicListLayoutVariant = TopicListLayoutVariant.LegacyCompact;
 
   private async loadMore(): Promise<void> {
     await this.viewModel.loadMore();
@@ -50,6 +52,7 @@ export struct PaginatedTopicList {
           ForEach(this.viewModel.presentationTopics, (topic: TopicUiModel) => {
             TopicListItem({
               topic: topic,
+              layoutVariant: this.layoutVariant,
               semanticId: `${this.semanticPrefix}-topic-${topic.topicId}`,
               onTopicClick: (selected: TopicUiModel) => this.onTopicSelected(selected)
             })

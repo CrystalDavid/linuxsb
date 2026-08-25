@@ -17,7 +17,7 @@ export class M1Runtime {
   private homeRepository: HomeRepository = new HomeRepository(this.transport, this.decoder, this.authSession);
   private topicRepository: TopicRepository = new TopicRepository(this.transport, this.decoder, this.authSession);
   private writeRepository: WriteRepository = new WriteRepository(this.transport, this.authSession);
-  private prefetchCoordinator: TopicPrefetchCoordinator = new TopicPrefetchCoordinator(this.topicRepository);
+  private prefetchCoordinator: TopicPrefetchCoordinator = new TopicPrefetchCoordinator(this.topicRepository, 900);
   readonly homeViewModel: HomeViewModel = new HomeViewModel(this.homeRepository, this.mapper);
   readonly forumViewModel: HomeViewModel = new HomeViewModel(this.homeRepository, this.mapper);
   readonly searchViewModel: HomeViewModel = new HomeViewModel(this.homeRepository, this.mapper);

@@ -339,6 +339,7 @@ export class RcpForumTransport implements ForumTransport {
           transfer: {
             autoRedirect: true,
             maxAutoRedirects: 5,
+            connectionReusePolicy: 'balanced',
             timeout: {
               connectMs: 8000,
               transferMs: 20000,

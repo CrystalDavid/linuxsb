@@ -1,14 +1,23 @@
 import { bundleManager } from '@kit.AbilityKit';
 import {
+  BlurStrategy,
+  HdsNavDestination,
+  HdsNavigation,
+  HdsTabs,
+  HdsTabsController
+} from '@kit.UIDesignKit';
+import {
   buildTopicRouteParam,
   COMPOSE_ROUTE,
   DIAGNOSTICS_ROUTE,
   isTopicRouteParam,
+  SETTINGS_ROUTE,
   TOPIC_ROUTE,
   TopicRouteParam
 } from '../../app/AppRoutes';
 import { m1Runtime } from '../../app/M1Runtime';
-import { SemanticColors } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors } from '../../common/theme/DesignSystem';
+import { SYS_BOTTOM_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
@@ -18,6 +27,7 @@ import { ForumsPage } from './ForumsPage';
 import { P0ProbePage } from './P0ProbePage';
 import { ProfilePage } from './ProfilePage';
 import { SearchPage } from './SearchPage';
+import { SettingsPage } from './SettingsPage';
 import { TopicDetailPage } from './TopicDetailPage';
 import { CommunityTab, ImmersiveBottomTabBar } from '../components/ImmersiveBottomTabBar';
 
@@ -40,6 +50,8 @@ export struct RootTabPage {
   @State private loginReturnTopicId: number = 0;
   @State private ignoreTopicTapUntil: number = 0;
   @State private selectedTab: CommunityTab = CommunityTab.Home;
+  @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
+  private tabsController: HdsTabsController = new HdsTabsController();
   private debugPackage: boolean = isDebugPackage();
 
   aboutToAppear(): void {
@@ -85,6 +97,18 @@ export struct RootTabPage {
 
   private openComposer(): void {
     this.pathStack.pushPathByName(COMPOSE_ROUTE, null);
+  }
+
+  private openSettings(): void {
+    this.pathStack.pushPathByName(SETTINGS_ROUTE, null);
+  }
+
+  private switchTab(tab: CommunityTab): void {
+    if (tab === this.selectedTab) {
+      return;
+    }
+    this.selectedTab = tab;
+    this.tabsController.changeIndex(tab as number);
   }
 
   private openCreatedTopic(topicId: number): void {
@@ -149,9 +173,23 @@ export struct RootTabPage {
   }
 
   @Builder
+  private diagnosticsTitleBar() {
+    Row() {
+      Text('P0 开发诊断')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(SemanticColors.textPrimary())
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ left: 16, right: 16 })
+    .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
   private pathMap(routeName: string, param: Object | undefined) {
     if (routeName === TOPIC_ROUTE && isTopicRouteParam(param)) {
-      NavDestination() {
+      HdsNavDestination() {
         TopicDetailPage({
           viewModel: m1Runtime.topicViewModel,
           topicId: (param as TopicRouteParam).topicId,
@@ -165,15 +203,15 @@ export struct RootTabPage {
       .hideTitleBar(true)
       .backgroundColor(SemanticColors.page())
     } else if (routeName === DIAGNOSTICS_ROUTE && this.debugPackage) {
-      NavDestination() {
+      HdsNavDestination() {
         P0ProbePage({
           onOpenFormalTopic: (topicId: number) => this.openDebugTopic(topicId)
         })
       }
-      .title('P0 开发诊断')
+      .titleBar({ content: { stackBuilder: () => this.diagnosticsTitleBar() } })
       .backgroundColor(SemanticColors.page())
     } else if (routeName === COMPOSE_ROUTE) {
-      NavDestination() {
+      HdsNavDestination() {
         ComposeTopicPage({
           catalogViewModel: m1Runtime.homeViewModel,
           authenticated: this.authenticated,
@@ -186,48 +224,111 @@ export struct RootTabPage {
       }
       .hideTitleBar(true)
       .backgroundColor(SemanticColors.page())
+    } else if (routeName === SETTINGS_ROUTE) {
+      HdsNavDestination() {
+        SettingsPage({ onBack: () => this.pathStack.pop() })
+      }
+      .hideTitleBar(true)
+      .backgroundColor(SemanticColors.page())
     }
+  }
+
+  @Builder
+  private hiddenTabBar() {
+    Row().width(1).height(1).opacity(0)
+  }
+
+  @Builder
+  private immersiveMiniBar() {
+    ImmersiveBottomTabBar({
+      selectedTab: this.selectedTab,
+      onSelect: (tab: CommunityTab) => this.switchTab(tab)
+    })
   }
 
   @Builder
   private rootTabContent() {
     Stack({ alignContent: Alignment.Bottom }) {
-      if (this.selectedTab === CommunityTab.Home) {
-        HomePage({
-          viewModel: m1Runtime.homeViewModel,
-          debugAvailable: this.debugPackage,
-          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic),
-          onOpenDiagnostics: () => this.openDiagnostics(),
-          onPrefetch: (topicIds: number[]) => m1Runtime.prefetchTopics(topicIds),
-          onCancelPrefetch: () => m1Runtime.cancelPrefetch()
-        })
-      } else if (this.selectedTab === CommunityTab.Forums) {
-        ForumsPage({
-          viewModel: m1Runtime.forumViewModel,
-          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
-        })
-      } else if (this.selectedTab === CommunityTab.Search) {
-        SearchPage({
-          viewModel: m1Runtime.searchViewModel,
-          authenticated: this.authenticated,
-          onLogin: () => this.requestHomeLogin(),
-          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
-        })
-      } else {
-        ProfilePage({
-          sessionViewModel: m1Runtime.homeViewModel,
-          profileViewModel: m1Runtime.profileViewModel,
-          authenticated: this.authenticated,
-          onLogin: () => this.requestHomeLogin(),
-          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
-        })
-      }
+      HdsTabs({ controller: this.tabsController, index: this.selectedTab as number }) {
+        TabContent() {
+          HomePage({
+            viewModel: m1Runtime.homeViewModel,
+            debugAvailable: this.debugPackage,
+            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic),
+            onOpenDiagnostics: () => this.openDiagnostics(),
+            onPrefetch: (topicIds: number[]) => m1Runtime.prefetchTopics(topicIds),
+            onCancelPrefetch: () => m1Runtime.cancelPrefetch(),
+            onCompose: () => this.openComposer()
+          })
+        }
+        .tabBar(this.hiddenTabBar())
 
-      ImmersiveBottomTabBar({
-        selectedTab: this.selectedTab,
-        onSelect: (tab: CommunityTab) => { this.selectedTab = tab; },
-        onCompose: () => this.openComposer()
+        TabContent() {
+          ForumsPage({
+            viewModel: m1Runtime.forumViewModel,
+            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+          })
+        }
+        .tabBar(this.hiddenTabBar())
+
+        TabContent() {
+          SearchPage({
+            viewModel: m1Runtime.searchViewModel,
+            authenticated: this.authenticated,
+            onLogin: () => this.requestHomeLogin(),
+            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+          })
+        }
+        .tabBar(this.hiddenTabBar())
+
+        TabContent() {
+          ProfilePage({
+            sessionViewModel: m1Runtime.homeViewModel,
+            profileViewModel: m1Runtime.profileViewModel,
+            authenticated: this.authenticated,
+            onLogin: () => this.requestHomeLogin(),
+            onOpenSettings: () => this.openSettings(),
+            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+          })
+        }
+        .tabBar(this.hiddenTabBar())
+      }
+      .id('hds-community-tabs')
+      .barOverlap(true)
+      .barPosition(BarPosition.End)
+      .vertical(false)
+      .scrollable(false)
+      // HdsTabs remains the native page container, but its own visual bar is deliberately collapsed.
+      // The visible bar below is the only glass layer; rendering both produced mismatched outlines.
+      .barWidth(1)
+      .barHeight(1)
+      .barBackgroundColor(Color.Transparent)
+      .barBackgroundBlurStyle(BlurStyle.NONE)
+      // HdsTabs content animation cannot be customized. Keep page replacement immediate and let the
+      // single native glass indicator provide the continuous cross-tab motion.
+      .animationDuration(0)
+      .blurStrategy(BlurStrategy.DISABLE)
+      .onSelected((index: number) => {
+        if (index >= CommunityTab.Home && index <= CommunityTab.Profile) {
+          this.selectedTab = index as CommunityTab;
+        }
       })
+      .onChange((index: number) => {
+        if (index >= CommunityTab.Home && index <= CommunityTab.Profile) {
+          this.selectedTab = index as CommunityTab;
+        }
+      })
+      .width('100%')
+      .height('100%')
+      .backgroundColor(SemanticColors.page())
+
+      Row() {
+        this.immersiveMiniBar()
+      }
+        .width(PageMetrics.BOTTOM_TAB_BAR_WIDTH)
+        .height(PageMetrics.BOTTOM_TAB_BAR_HEIGHT)
+        .margin({ bottom: PageMetrics.BOTTOM_TAB_BAR_BOTTOM_MARGIN + this.bottomInset })
+        .zIndex(2)
     }
     .width('100%').height('100%')
     .backgroundColor(SemanticColors.page())
@@ -235,7 +336,7 @@ export struct RootTabPage {
 
   build() {
     Stack() {
-      Navigation(this.pathStack) {
+      HdsNavigation(this.pathStack) {
         this.rootTabContent()
       }
       .hideTitleBar(true)

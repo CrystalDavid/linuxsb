@@ -3,11 +3,10 @@ import {
   HdsNavigationTitleBarStyle,
   ScrollEffectOptions,
   ScrollEffectType,
-  SystemMaterialParams,
   TitleBarStyleOptions
 } from '@kit.UIDesignKit';
 import {
-  adaptiveSystemMaterialEffect,
+  emphasizedSystemMaterialEffect,
   HDS_TITLE_BAR_BLUR_RADIUS,
   HDS_TITLE_BAR_MASK_EXTRA_HEIGHT,
   preferredTitleBarScrollEffectType
@@ -42,6 +41,7 @@ export function buildImmersiveTitleBarStyle(
     originalStyle: originalStyle,
     scrollEffectStyle: scrollEffectStyle,
     blurStrategy: BlurStrategy.ENABLE,
-    systemMaterialEffect: adaptiveSystemMaterialEffect() as SystemMaterialParams
+    thermoCtrl: true,
+    systemMaterialEffect: emphasizedSystemMaterialEffect()
   };
 }

@@ -44,7 +44,9 @@ export class TopicDetailViewModel {
       this.applyDetail(cached);
       this.state = ViewLoadState.Content;
       this.errorMessage = '';
-      this.refreshFromSource(topicId, true, generation, true);
+      // A fresh cache entry must not immediately trigger another GET. loadTopic(false)
+      // revalidates only after the two-minute cache TTL has expired.
+      this.refreshFromSource(topicId, false, generation, true);
       return;
     }
     if (preserveSameTopic) {

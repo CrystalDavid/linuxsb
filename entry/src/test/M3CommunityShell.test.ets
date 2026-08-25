@@ -33,6 +33,7 @@ import {
 } from '../main/ets/services/transport/ForumTransport';
 import { ForumRouteBuilder } from '../main/ets/services/transport/ForumRouteBuilder';
 import { HomeViewModel } from '../main/ets/viewmodels/HomeViewModel';
+import { shouldAutoLoadNextHomePage } from '../main/ets/common/ui/HomePaginationPolicy';
 
 function metadata(url: string = 'https://linux.sb/'): TransportProbeMetadata {
   return {
@@ -194,6 +195,14 @@ export default function m3CommunityShellTest() {
       expect(result.nextPageUrl).assertEqual('https://linux.sb/index.php?sort=comment&p=2');
     });
 
+    it('falls back to the nearest real numeric page href when the next control has no text', 0, () => {
+      const fixture = homeMarkup(2).replace('>下一页</a>', '><span aria-label="下一页"></span></a>');
+      const result = new HomeProbeDecoder().decode(fixture);
+      expect(result.currentPage).assertEqual(1);
+      expect(result.totalPages).assertEqual(50);
+      expect(result.nextPageUrl).assertEqual('https://linux.sb/index.php?sort=comment&p=2');
+    });
+
     it('accepts a real empty-state page as an empty feed', 0, () => {
       const result = new HomeProbeDecoder().decode(
         '<link href="/app/assets/index.css?v=v8.6.5"><li class="empty-state">没有主题</li>');
@@ -242,6 +251,32 @@ export default function m3CommunityShellTest() {
       expect(viewModel.topics[2].topicId).assertEqual(3);
       expect(source.requests[1].pageUrl).assertEqual(next);
       expect(viewModel.hasMore()).assertFalse();
+    });
+
+    it('continues through every server-provided Home page instead of stopping after the first append', 0, async () => {
+      const page2 = 'https://linux.sb/index.php?sort=comment&p=2';
+      const page3 = 'https://linux.sb/index.php?sort=comment&p=3';
+      const source = new SequenceHomeSource([
+        { ok: true, data: feed([1, 2], page2, 1), diagnostics: emptyDiagnostics() },
+        { ok: true, data: feed([3, 4], page3, 2), diagnostics: emptyDiagnostics() },
+        { ok: true, data: feed([5, 6], '', 3), diagnostics: emptyDiagnostics() }
+      ]);
+      const viewModel = new HomeViewModel(source);
+      await viewModel.load();
+      await viewModel.loadMore();
+      await viewModel.loadMore();
+      expect(viewModel.topics.length).assertEqual(6);
+      expect(source.requests[1].pageUrl).assertEqual(page2);
+      expect(source.requests[2].pageUrl).assertEqual(page3);
+      expect(viewModel.hasMore()).assertFalse();
+    });
+
+    it('loads once per near-end viewport and re-arms after topics are appended', 0, () => {
+      expect(shouldAutoLoadNextHomePage(27, 30, true, false, -1)).assertTrue();
+      expect(shouldAutoLoadNextHomePage(29, 30, true, false, 30)).assertFalse();
+      expect(shouldAutoLoadNextHomePage(31, 60, true, false, 30)).assertFalse();
+      expect(shouldAutoLoadNextHomePage(57, 60, true, false, 30)).assertTrue();
+      expect(shouldAutoLoadNextHomePage(57, 60, true, true, 30)).assertFalse();
     });
 
     it('rejects search before transport when no memory login exists', 0, async () => {

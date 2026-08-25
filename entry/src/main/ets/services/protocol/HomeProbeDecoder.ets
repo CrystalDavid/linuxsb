@@ -34,6 +34,11 @@ class CurrentUserDraft {
   bio: string = '';
 }
 
+class PaginationLinkDraft {
+  page: number = 0;
+  url: string = '';
+}
+
 export class HomeProbeDecoder {
   decode(html: string): HomeProbeResult {
     const topics: HomeTopicProbeSummary[] = [];
@@ -46,6 +51,19 @@ export class HomeProbeDecoder {
     let anchorKind = '';
     let anchorText = '';
     let anchorId = 0;
+    let forumAnchorColor = '';
+    let forumAnchorName = '';
+    let forumAnchorCount = '';
+    let forumAnchorNameDepth = 0;
+    let forumAnchorCountDepth = 0;
+    let pageForumId = 0;
+    let forumHeaderDepth = 0;
+    let forumHeaderNameDepth = 0;
+    let forumHeaderDescriptionDepth = 0;
+    let forumHeaderCountDepth = 0;
+    let forumHeaderName = '';
+    let forumHeaderDescription = '';
+    let forumHeaderCount = '';
     let postMetaDepth = 0;
     let postMetaSpanDepth = 0;
     let postMetaSpanIndex = 0;
@@ -58,6 +76,7 @@ export class HomeProbeDecoder {
     let currentPage = 1;
     let totalPages = 1;
     let nextPageUrl = '';
+    const paginationLinks: PaginationLinkDraft[] = [];
     let userCardDepth = 0;
     let userRankDepth = 0;
     let userRankText = '';
@@ -98,8 +117,39 @@ export class HomeProbeDecoder {
         } else if (userBioDepth > 0 && token.name === 'div') {
           userBioDepth++;
         }
-        if (token.name === 'link' && bbsVersion.length === 0) {
-          bbsVersion = extractBbsVersion(token.attributes.get('href') ?? '');
+        if (token.name === 'link') {
+          const linkHref = token.attributes.get('href') ?? '';
+          if (bbsVersion.length === 0) {
+            bbsVersion = extractBbsVersion(linkHref);
+          }
+          if ((token.attributes.get('rel') ?? '') === 'canonical') {
+            pageForumId = parseRouteId(linkHref, '/forum/');
+          }
+        }
+        if (token.name === 'section' && hasClass(token.attributes, 'forum-enhancements-forum-header')) {
+          forumHeaderDepth = 1;
+          forumHeaderName = '';
+          forumHeaderDescription = '';
+          forumHeaderCount = '';
+        } else if (forumHeaderDepth > 0 && !token.selfClosing) {
+          forumHeaderDepth++;
+        }
+        if (forumHeaderDepth > 0 && token.name === 'h1') {
+          forumHeaderNameDepth = 1;
+        } else if (forumHeaderNameDepth > 0 && !token.selfClosing) {
+          forumHeaderNameDepth++;
+        }
+        if (forumHeaderDepth > 0 && token.name === 'p' &&
+          hasClass(token.attributes, 'forum-enhancements-description')) {
+          forumHeaderDescriptionDepth = 1;
+        } else if (forumHeaderDescriptionDepth > 0 && !token.selfClosing) {
+          forumHeaderDescriptionDepth++;
+        }
+        if (forumHeaderDepth > 0 && token.name === 'span' &&
+          hasClass(token.attributes, 'forum-enhancements-topic-count')) {
+          forumHeaderCountDepth = 1;
+        } else if (forumHeaderCountDepth > 0 && !token.selfClosing) {
+          forumHeaderCountDepth++;
         }
         if (token.name === 'li' && hasClass(token.attributes, 'post-item')) {
           this.finalizeTopic(currentItem, topics, topicIds, warnings);
@@ -143,6 +193,19 @@ export class HomeProbeDecoder {
           currentUser.avatarUrl.length === 0) {
           currentUser.avatarUrl = this.normalizeAssetUrl(token.attributes.get('src') ?? '');
         }
+        if (anchorKind === 'forum-metadata' && token.name === 'span') {
+          if (hasClass(token.attributes, 'forum-enhancements-name') ||
+            hasClass(token.attributes, 'forum-enhancements-sidebar-name')) {
+            forumAnchorNameDepth = 1;
+          } else if (hasClass(token.attributes, 'forum-enhancements-count') ||
+            hasClass(token.attributes, 'forum-enhancements-sidebar-count')) {
+            forumAnchorCountDepth = 1;
+          } else if (forumAnchorNameDepth > 0) {
+            forumAnchorNameDepth++;
+          } else if (forumAnchorCountDepth > 0) {
+            forumAnchorCountDepth++;
+          }
+        }
         if (token.name !== 'a') {
           return;
         }
@@ -150,6 +213,11 @@ export class HomeProbeDecoder {
         anchorKind = '';
         anchorText = '';
         anchorId = 0;
+        forumAnchorColor = '';
+        forumAnchorName = '';
+        forumAnchorCount = '';
+        forumAnchorNameDepth = 0;
+        forumAnchorCountDepth = 0;
         const href = token.attributes.get('href') ?? '';
         paginationAnchorHref = '';
         paginationAnchorActive = false;
@@ -175,7 +243,15 @@ export class HomeProbeDecoder {
           anchorKind = 'author';
           anchorId = authorId;
         } else if (forumId > 0) {
-          anchorKind = currentItem !== undefined ? 'item-forum' : 'forum';
+          const style = token.attributes.get('style') ?? '';
+          if (hasClass(token.attributes, 'forum-enhancements-link') ||
+            hasClass(token.attributes, 'forum-enhancements-sidebar-link') ||
+            style.indexOf('--forum-enhancements-color') >= 0) {
+            anchorKind = 'forum-metadata';
+            forumAnchorColor = this.parseForumColor(style);
+          } else {
+            anchorKind = currentItem !== undefined ? 'item-forum' : 'forum';
+          }
           anchorId = forumId;
         } else if (href.startsWith('https://bbs1.org') || href.startsWith('https://www.bbs1.org')) {
           anchorKind = 'version';
@@ -186,6 +262,21 @@ export class HomeProbeDecoder {
       if (token.type === HtmlTokenType.TEXT) {
         if (anchorKind.length > 0) {
           anchorText += token.text;
+        }
+        if (forumAnchorNameDepth > 0) {
+          forumAnchorName += token.text;
+        }
+        if (forumAnchorCountDepth > 0) {
+          forumAnchorCount += token.text;
+        }
+        if (forumHeaderNameDepth > 0) {
+          forumHeaderName += token.text;
+        }
+        if (forumHeaderDescriptionDepth > 0) {
+          forumHeaderDescription += token.text;
+        }
+        if (forumHeaderCountDepth > 0) {
+          forumHeaderCount += token.text;
         }
         if (userRankDepth > 0) {
           userRankText += token.text;
@@ -215,6 +306,10 @@ export class HomeProbeDecoder {
           this.addForum(forums, forumIds, anchorId, text);
         } else if (anchorKind === 'forum') {
           this.addForum(forums, forumIds, anchorId, text);
+        } else if (anchorKind === 'forum-metadata') {
+          const name = collapseWhitespace(forumAnchorName);
+          this.addForum(forums, forumIds, anchorId, name.length > 0 ? name : text, '',
+            this.parseFirstNumber(forumAnchorCount), forumAnchorColor);
         } else if ((anchorKind === 'session-user-name' || anchorKind === 'session-user-avatar') &&
           currentUserSeen) {
           currentUser.userId = anchorId;
@@ -222,7 +317,17 @@ export class HomeProbeDecoder {
             currentUser.name = text;
           }
         } else if (anchorKind === 'pagination') {
-          const page = this.parsePageNumber(text);
+          const normalizedPageUrl = this.normalizePageUrl(paginationAnchorHref);
+          let page = this.parsePageNumber(text);
+          if (page <= 0) {
+            page = this.pageFromUrl(normalizedPageUrl);
+          }
+          if (page > 0 && normalizedPageUrl.length > 0 && paginationLinks.length < 100) {
+            const link = new PaginationLinkDraft();
+            link.page = page;
+            link.url = normalizedPageUrl;
+            paginationLinks.push(link);
+          }
           if (page > totalPages) {
             totalPages = page;
           }
@@ -230,7 +335,7 @@ export class HomeProbeDecoder {
             currentPage = page;
           }
           if (text === '下一页') {
-            nextPageUrl = this.normalizePageUrl(paginationAnchorHref);
+            nextPageUrl = normalizedPageUrl;
             const nextPage = this.pageFromUrl(nextPageUrl);
             if (nextPage > 1 && currentPage === 1) {
               currentPage = nextPage - 1;
@@ -245,12 +350,38 @@ export class HomeProbeDecoder {
         anchorKind = '';
         anchorText = '';
         anchorId = 0;
+        forumAnchorColor = '';
+        forumAnchorName = '';
+        forumAnchorCount = '';
+        forumAnchorNameDepth = 0;
+        forumAnchorCountDepth = 0;
         paginationAnchorHref = '';
         paginationAnchorActive = false;
         if (paginationDepth > 0) {
           paginationDepth--;
         }
         return;
+      }
+
+      if (token.type === HtmlTokenType.END_TAG) {
+        if (forumAnchorNameDepth > 0) {
+          forumAnchorNameDepth--;
+        }
+        if (forumAnchorCountDepth > 0) {
+          forumAnchorCountDepth--;
+        }
+        if (forumHeaderNameDepth > 0) {
+          forumHeaderNameDepth--;
+        }
+        if (forumHeaderDescriptionDepth > 0) {
+          forumHeaderDescriptionDepth--;
+        }
+        if (forumHeaderCountDepth > 0) {
+          forumHeaderCountDepth--;
+        }
+        if (forumHeaderDepth > 0) {
+          forumHeaderDepth--;
+        }
       }
 
       if (token.type === HtmlTokenType.END_TAG && currentItem !== undefined) {
@@ -311,11 +442,25 @@ export class HomeProbeDecoder {
     });
 
     this.finalizeTopic(currentItem, topics, topicIds, warnings);
+    if (pageForumId > 0) {
+      this.addForum(forums, forumIds, pageForumId, collapseWhitespace(forumHeaderName),
+        collapseWhitespace(forumHeaderDescription), this.parseFirstNumber(forumHeaderCount));
+    }
     if (bbsVersion.length === 0) {
       warnings.push('BBS_VERSION_MISSING');
     }
     if (topics.length === 0 && emptyStateCount === 0) {
       warnings.push('HOME_TOPIC_LIST_MISSING');
+    }
+    if (nextPageUrl.length === 0 && currentPage < totalPages) {
+      let nearestNextPage = Number.MAX_SAFE_INTEGER;
+      for (let index = 0; index < paginationLinks.length; index++) {
+        const link = paginationLinks[index];
+        if (link.page > currentPage && link.page < nearestNextPage) {
+          nearestNextPage = link.page;
+          nextPageUrl = link.url;
+        }
+      }
     }
     let user: CurrentUserProbeSummary | undefined = undefined;
     if (currentUserSeen && currentUser.userId > 0 && currentUser.name.length > 0) {
@@ -341,12 +486,40 @@ export class HomeProbeDecoder {
     };
   }
 
-  private addForum(forums: ForumProbeSummary[], ids: Set<number>, forumId: number, name: string): void {
-    if (forumId <= 0 || name.length === 0 || ids.has(forumId)) {
+  private addForum(forums: ForumProbeSummary[], ids: Set<number>, forumId: number, name: string,
+    description: string = '', topicCount: number = -1, colorHex: string = ''): void {
+    if (forumId <= 0) {
+      return;
+    }
+    for (let index = 0; index < forums.length; index++) {
+      if (forums[index].forumId !== forumId) {
+        continue;
+      }
+      if (name.length > 0) {
+        forums[index].name = name;
+      }
+      if (description.length > 0) {
+        forums[index].description = description;
+      }
+      if (topicCount >= 0) {
+        forums[index].topicCount = topicCount;
+      }
+      if (colorHex.length > 0) {
+        forums[index].colorHex = colorHex;
+      }
+      return;
+    }
+    if (name.length === 0 || ids.has(forumId)) {
       return;
     }
     ids.add(forumId);
-    forums.push({ forumId: forumId, name: name });
+    forums.push({
+      forumId: forumId,
+      name: name,
+      description: description.length > 0 ? description : undefined,
+      topicCount: topicCount >= 0 ? topicCount : undefined,
+      colorHex: colorHex.length > 0 ? colorHex : undefined
+    });
   }
 
   private finalizeTopic(draft: HomeTopicDraft | undefined, topics: HomeTopicProbeSummary[], ids: Set<number>, warnings: string[]): void {
@@ -492,6 +665,49 @@ export class HomeProbeDecoder {
       }
     }
     return normalized.length > 0 ? this.parsePositiveNumber(normalized) : -1;
+  }
+
+  private parseFirstNumber(value: string): number {
+    let normalized = '';
+    let found = false;
+    for (let index = 0; index < value.length; index++) {
+      const current = value.charAt(index);
+      if (current >= '0' && current <= '9') {
+        found = true;
+        normalized += current;
+      } else if (found && current !== ',' && current !== ' ') {
+        break;
+      }
+    }
+    return normalized.length > 0 ? this.parsePositiveNumber(normalized) : -1;
+  }
+
+  private parseForumColor(style: string): string {
+    const marker = '--forum-enhancements-color:';
+    const markerIndex = style.indexOf(marker);
+    if (markerIndex < 0) {
+      return '';
+    }
+    let index = markerIndex + marker.length;
+    while (index < style.length && style.charAt(index) === ' ') {
+      index++;
+    }
+    if (index >= style.length || style.charAt(index) !== '#') {
+      return '';
+    }
+    let color = '#';
+    index++;
+    while (index < style.length && color.length <= 8) {
+      const current = style.charAt(index);
+      const isDigit = current >= '0' && current <= '9';
+      const lower = current.toLowerCase();
+      if (!isDigit && (lower < 'a' || lower > 'f')) {
+        break;
+      }
+      color += current;
+      index++;
+    }
+    return color.length === 7 || color.length === 9 ? color : '';
   }
 
   private parsePositiveNumber(value: string): number {

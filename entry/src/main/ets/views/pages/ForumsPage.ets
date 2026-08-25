@@ -1,5 +1,7 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { ForumVisuals } from '../../common/theme/ForumVisuals';
+import { TITLE_FONT_SIZE_DEFAULT } from '../../common/theme/TopicListStylePrefs';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
@@ -10,9 +12,10 @@ import { FeedSort, ForumSummary, HomeFeedRequest } from '../../models/HomeModels
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
+import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 
-@Component
+@Component({ freezeWhenInactive: true })
 export struct ForumsPage {
   @ObjectLink viewModel: HomeViewModel;
   bottomContentInset: number = PageMetrics.BOTTOM_TAB_BAR_CONTENT_INSET;
@@ -35,17 +38,30 @@ export struct ForumsPage {
   }
 
   private syncForums(): void {
-    this.forums = (this.viewModel.forums ?? []).slice();
+    const discovered = (this.viewModel.forums ?? []).slice();
+    const directoryForums = discovered.filter((forum: ForumSummary) =>
+      (forum.topicCount ?? -1) >= 0 || (forum.description ?? '').length > 0 || (forum.colorHex ?? '').length > 0);
+    // The BBS page also repeats recently visited/topic category links. They are
+    // useful as topic metadata, but only the enriched directory entries are
+    // stable public board destinations. Fall back only if an older BBS1 theme
+    // omits the directory metadata entirely.
+    this.forums = directoryForums.length > 0 ? directoryForums : discovered;
   }
 
-  private async selectForum(forumId: number): Promise<void> {
-    if (forumId === this.selectedForumId && this.viewModel.state !== ViewLoadState.Idle) {
+  private selectForum(forumId: number): void {
+    if (forumId <= 0 || (forumId === this.selectedForumId && this.viewModel.state !== ViewLoadState.Idle)) {
       return;
     }
     this.selectedForumId = forumId;
-    this.viewModel.configure(forumId > 0 ?
-      HomeFeedRequest.forum(forumId, this.selectedSort) : HomeFeedRequest.home(this.selectedSort));
-    await this.load(false);
+    this.viewModel.configure(HomeFeedRequest.forum(forumId, this.selectedSort));
+    // Navigation must complete before the board request. Keeping the click
+    // callback synchronous avoids TestKit and the user gesture waiting on a
+    // slow network response before the native board screen can render.
+    this.load(false);
+  }
+
+  private showForumDirectory(): void {
+    this.selectedForumId = 0;
   }
 
   private async changeSort(sort: FeedSort): Promise<void> {
@@ -58,93 +74,162 @@ export struct ForumsPage {
     await this.load(false);
   }
 
-  private chipColor(selected: boolean): ResourceColor {
-    return selected ? $r('app.color.brand_primary') : SemanticColors.textSecondary();
+  private selectedForumName(): string {
+    return this.forums.find((forum: ForumSummary) => forum.forumId === this.selectedForumId)?.name ?? '板块';
+  }
+
+  private sortOptions(): SegmentOption[] {
+    return [
+      new SegmentOption('新评论', 'forums-sort-comments'),
+      new SegmentOption('新帖子', 'forums-sort-topics')
+    ];
   }
 
   @Builder
-  private forumChip(id: number, name: string) {
-    Button(name, { type: ButtonType.Capsule, stateEffect: true })
-      .id(id === 0 ? 'forum-all' : `forum-${id}`)
-      .height(38)
-      .padding({ left: Spacing.LG, right: Spacing.LG })
-      .fontSize(Typography.LABEL)
-      .fontWeight(this.selectedForumId === id ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.chipColor(this.selectedForumId === id))
-      .backgroundColor(this.selectedForumId === id ? $r('app.color.brand_soft') : SemanticColors.surfaceMuted())
-      .borderRadius(Radius.PILL)
-      .onClick(() => this.selectForum(id))
-  }
+  private forumRow(forum: ForumSummary, first: boolean) {
+    Column() {
+      Row({ space: Spacing.MD }) {
+        Row()
+          .width(16).height(16)
+          .backgroundColor(ForumVisuals.accent(forum.forumId, forum.colorHex ?? ''))
+          .borderRadius(4)
 
-  @Builder
-  private selector() {
-    Column({ space: Spacing.SM }) {
-      Scroll() {
-        Row({ space: Spacing.SM }) {
-          this.forumChip(0, '全部')
-          ForEach(this.forums, (forum: ForumSummary) => {
-            this.forumChip(forum.forumId, forum.name)
-          }, (forum: ForumSummary) => forum.forumId.toString())
+        Column({ space: 2 }) {
+          Text(forum.name)
+            .fontSize(TITLE_FONT_SIZE_DEFAULT)
+            .fontWeight(FontWeight.Normal)
+            .fontColor(SemanticColors.textPrimary())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(ForumVisuals.description(forum.forumId, forum.description ?? ''))
+            .fontSize(Typography.CAPTION)
+            .fontColor(SemanticColors.textTertiary())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
-        .padding({ left: Spacing.MD, right: Spacing.MD })
-      }
-      .width('100%')
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
 
-      Row({ space: Spacing.XS }) {
-        Button('新评论', { type: ButtonType.Normal, stateEffect: true })
-          .height(30).fontSize(Typography.CAPTION)
-          .fontColor(this.selectedSort === FeedSort.NewComments ? $r('app.color.brand_primary') :
-            SemanticColors.textSecondary())
-          .backgroundColor(Color.Transparent)
-          .onClick(() => this.changeSort(FeedSort.NewComments))
-        Button('新帖子', { type: ButtonType.Normal, stateEffect: true })
-          .height(30).fontSize(Typography.CAPTION)
-          .fontColor(this.selectedSort === FeedSort.NewTopics ? $r('app.color.brand_primary') :
-            SemanticColors.textSecondary())
-          .backgroundColor(Color.Transparent)
-          .onClick(() => this.changeSort(FeedSort.NewTopics))
-        Blank()
-        Text(this.selectedForumId === 0 ? '全部板块' :
-          (this.forums.find((forum: ForumSummary) => forum.forumId === this.selectedForumId)?.name ?? '板块'))
-          .fontSize(Typography.CAPTION)
-          .fontColor(SemanticColors.textTertiary())
+        if ((forum.topicCount ?? -1) >= 0) {
+          Text((forum.topicCount ?? 0).toString())
+            .fontSize(Typography.CAPTION)
+            .fontColor(SemanticColors.textTertiary())
+            .maxLines(1)
+        }
+
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(15)
+          .fontColor([SemanticColors.textTertiary()])
       }
+      .id(first ? 'forum-first-row' : `forum-${forum.forumId}`)
+      .accessibilityText(`${forum.name}板块${(forum.topicCount ?? -1) >= 0 ? `，${forum.topicCount}个主题` : ''}`)
       .width('100%')
-      .padding({ left: Spacing.MD, right: Spacing.MD })
+      .height(64)
+      .padding({ left: Spacing.LG, right: Spacing.LG })
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => this.selectForum(forum.forumId))
+
+      Divider()
+        .strokeWidth(0.5)
+        .color(SemanticColors.divider())
+        .margin({ left: Spacing.LG + 16 + Spacing.MD, right: Spacing.LG })
     }
     .width('100%')
-    .padding({ top: Spacing.SM, bottom: Spacing.SM })
-    .backgroundColor(SemanticColors.surface())
   }
 
   @Builder
   private titleBar() {
-    Row() {
-      Text('板块')
+    Row({ space: Spacing.SM }) {
+      if (this.selectedForumId > 0) {
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.chevron_left'))
+            .fontSize(21)
+            .fontColor([SemanticColors.textPrimary()])
+        }
+        .id('forums-back')
+        .width(40).height(40)
+        .backgroundColor(Color.Transparent)
+        .onClick(() => this.showForumDirectory())
+      }
+      Text(this.selectedForumId > 0 ? this.selectedForumName() : '板块')
         .fontSize(Typography.TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
     }
     .width('100%').height('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD })
     .alignItems(VerticalAlign.Center)
   }
 
+  @Builder
+  private forumDirectory() {
+    if (this.forums.length > 0) {
+      List() {
+        ForEach(this.forums, (forum: ForumSummary, index: number) => {
+          ListItem() { this.forumRow(forum, index === 0) }
+        }, (forum: ForumSummary) => forum.forumId.toString())
+        ListItem() { Column().height(this.bottomContentInset) }
+      }
+      .id('forum-directory')
+      .width('100%').height('100%')
+      .scrollBar(BarState.Off)
+    } else if (this.viewModel.state === ViewLoadState.Loading || this.viewModel.state === ViewLoadState.Idle) {
+      Column({ space: Spacing.SM }) {
+        LoadingProgress().width(28).height(28).color($r('app.color.brand_primary'))
+        Text('正在读取板块').fontSize(Typography.BODY).fontColor(SemanticColors.textSecondary())
+      }
+      .width('100%').height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({ bottom: this.bottomContentInset })
+    } else {
+      Column({ space: Spacing.MD }) {
+        Text('暂时无法读取板块').fontSize(Typography.BODY).fontColor(SemanticColors.textSecondary())
+        Button('重试', { type: ButtonType.Capsule, stateEffect: true }).onClick(() => this.load(false))
+      }
+      .width('100%').height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({ bottom: this.bottomContentInset })
+    }
+  }
+
+  @Builder
+  private forumTopics() {
+    Column({ space: Spacing.SM }) {
+      Row() {
+        CompactSegmentedControl({
+          options: this.sortOptions(),
+          selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
+          onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
+        })
+        Blank()
+      }
+      .width('100%')
+      .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.SM })
+
+      PaginatedTopicList({
+        viewModel: this.viewModel,
+        bottomInset: this.bottomContentInset,
+        semanticPrefix: 'forums',
+        emptyTitle: '这个板块还没有主题',
+        onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
+        onRetry: () => this.load(false)
+      })
+        .layoutWeight(1)
+    }
+    .width('100%').height('100%')
+  }
+
   build() {
     HdsNavigation() {
       Column() {
-        this.selector()
-        PaginatedTopicList({
-          viewModel: this.viewModel,
-          bottomInset: this.bottomContentInset,
-          semanticPrefix: 'forums',
-          emptyTitle: '这个板块还没有主题',
-          onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
-          onRetry: () => this.load(false)
-        })
-          .layoutWeight(1)
+        if (this.selectedForumId === 0) {
+          this.forumDirectory()
+        } else {
+          this.forumTopics()
+        }
       }
       .id('forums-page')
       .width('100%').height('100%')

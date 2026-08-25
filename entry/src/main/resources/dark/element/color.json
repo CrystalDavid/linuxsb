@@ -2,19 +2,19 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#FF101418"
+      "value": "#FF0B0F12"
     },
     {
       "name": "page_background",
-      "value": "#FF101418"
+      "value": "#FF0B0F12"
     },
     {
       "name": "surface",
-      "value": "#FF1A2026"
+      "value": "#FF0B0F12"
     },
     {
       "name": "surface_secondary",
-      "value": "#FF222A31"
+      "value": "#FF0B0F12"
     },
     {
       "name": "primary",
@@ -74,11 +74,11 @@
     },
     {
       "name": "surface_elevated",
-      "value": "#FF20272E"
+      "value": "#FF0B0F12"
     },
     {
       "name": "divider",
-      "value": "#FF2A333B"
+      "value": "#1FFFFFFF"
     },
     {
       "name": "warning_soft",
@@ -106,11 +106,11 @@
     },
     {
       "name": "hds_title_bar_scrolled_bg",
-      "value": "#E6101418"
+      "value": "#E60B0F12"
     },
     {
       "name": "post_content_surface_bg",
-      "value": "#FF222A31"
+      "value": "#FF0B0F12"
     },
     {
       "name": "post_content_border",
@@ -118,15 +118,15 @@
     },
     {
       "name": "immersive_input_field_bg",
-      "value": "#FF252D34"
+      "value": "#FF0B0F12"
     },
     {
       "name": "bottom_tab_bar_bg",
-      "value": "#E61A2026"
+      "value": "#24FFFFFF"
     },
     {
       "name": "bottom_tab_bar_highlight",
-      "value": "#38FFFFFF"
+      "value": "#C2FFFFFF"
     },
     {
       "name": "bottom_tab_bar_shadow",
@@ -135,6 +135,102 @@
     {
       "name": "brand_primary_bright",
       "value": "#FF78A8FF"
+    },
+    {
+      "name": "liquid_glass_bg",
+      "value": "#24FFFFFF"
+    },
+    {
+      "name": "liquid_glass_highlight",
+      "value": "#C2FFFFFF"
+    },
+    {
+      "name": "liquid_segment_bg",
+      "value": "#24FFFFFF"
+    },
+    {
+      "name": "liquid_segment_selected",
+      "value": "#2CFFFFFF"
+    },
+    {
+      "name": "bottom_tab_selected_bg",
+      "value": "#2CFFFFFF"
+    },
+    {
+      "name": "send_button_bg",
+      "value": "#FF151A20"
+    },
+    {
+      "name": "hds_floating_action_bg",
+      "value": "#24FFFFFF"
+    },
+    {
+      "name": "hds_floating_action_highlight",
+      "value": "#C2FFFFFF"
+    },
+    {
+      "name": "hds_floating_action_glow",
+      "value": "#66000000"
+    },
+    {
+      "name": "fab_compose_bg",
+      "value": "#FF78A8FF"
+    },
+    {
+      "name": "bottom_tab_selected_glow",
+      "value": "#50000000"
+    },
+    {
+      "name": "bottom_tab_foreground",
+      "value": "#FFF5F7FA"
+    },
+    {
+      "name": "topic_status_pinned",
+      "value": "#FF78A8FF"
+    },
+    {
+      "name": "topic_status_pinned_soft",
+      "value": "#2C78A8FF"
+    },
+    {
+      "name": "topic_status_featured",
+      "value": "#FFC4A7FF"
+    },
+    {
+      "name": "topic_status_featured_soft",
+      "value": "#2CC4A7FF"
+    },
+    {
+      "name": "topic_status_hot",
+      "value": "#FFFF8D86"
+    },
+    {
+      "name": "topic_status_hot_soft",
+      "value": "#2CFF8D86"
+    },
+    {
+      "name": "topic_status_lottery",
+      "value": "#FFFF82B2"
+    },
+    {
+      "name": "topic_status_lottery_soft",
+      "value": "#2CFF82B2"
+    },
+    {
+      "name": "topic_status_card_active",
+      "value": "#FF61D8C9"
+    },
+    {
+      "name": "topic_status_card_active_soft",
+      "value": "#2C61D8C9"
+    },
+    {
+      "name": "topic_status_card_finished",
+      "value": "#FFAAB4BF"
+    },
+    {
+      "name": "topic_status_card_finished_soft",
+      "value": "#2CAAB4BF"
     }
   ]
 }

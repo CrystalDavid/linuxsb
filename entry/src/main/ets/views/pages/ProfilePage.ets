@@ -1,5 +1,5 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
-import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
@@ -10,6 +10,9 @@ import { CurrentUserSummary, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicUiModel, UserUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
+import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
+import { HomeFab } from '../components/HomeFab';
+import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 import { UserAvatar } from '../components/UserAvatar';
 
@@ -18,18 +21,21 @@ enum ProfileTab {
   Replies = 1
 }
 
-@Component
+@Component({ freezeWhenInactive: true })
 export struct ProfilePage {
   @ObjectLink sessionViewModel: HomeViewModel;
   @ObjectLink profileViewModel: HomeViewModel;
   @Prop @Watch('onAuthenticatedChanged') authenticated: boolean = false;
   bottomContentInset: number = PageMetrics.BOTTOM_TAB_BAR_CONTENT_INSET;
   onLogin: () => void = () => {};
+  onOpenSettings: () => void = () => {};
   onTopicSelected: (topic: TopicUiModel) => void = () => {};
   @State private selectedTab: ProfileTab = ProfileTab.Topics;
   @State private resolvingProfile: boolean = false;
   @State private profileError: string = '';
   @State private user: CurrentUserSummary | undefined = undefined;
+  @State private contentWidth: number = 0;
+  @State private contentHeight: number = 0;
 
   aboutToAppear(): void {
     this.resolveProfile();
@@ -87,6 +93,13 @@ export struct ProfilePage {
     return output;
   }
 
+  private profileOptions(): SegmentOption[] {
+    return [
+      new SegmentOption('主题', 'profile-tab-topics'),
+      new SegmentOption('回帖', 'profile-tab-replies')
+    ];
+  }
+
   @Builder
   private titleBar() {
     Row() {
@@ -103,29 +116,23 @@ export struct ProfilePage {
   @Builder
   private loginGate() {
     Column({ space: Spacing.MD }) {
-      SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
+      SymbolGlyph($r('sys.symbol.person_badge_lock_fill'))
         .fontSize(54)
         .fontColor([$r('app.color.brand_primary')])
       Text('登录后查看个人主页')
         .fontSize(Typography.TITLE_SMALL)
         .fontWeight(FontWeight.Medium)
         .fontColor(SemanticColors.textPrimary())
-      Text('登录在 linux.sb 官方页面完成，App 不保存账号密码。')
-        .fontSize(Typography.BODY)
-        .fontColor(SemanticColors.textSecondary())
-        .textAlign(TextAlign.Center)
-      Button('打开官方登录页', { type: ButtonType.Capsule, stateEffect: true })
-        .id('profile-login-action')
-        .height(44)
-        .fontColor(Color.White)
-        .backgroundColor($r('app.color.brand_primary'))
-        .onClick(() => this.onLogin())
+      ImmersiveGlassTextButton({
+        label: '打开官方登录页',
+        semanticId: 'profile-login-action',
+        onAction: () => this.onLogin()
+      })
     }
     .id('profile-login-required')
     .width('100%')
     .padding(Spacing.XL)
-    .backgroundColor(SemanticColors.surface())
-    .borderRadius(Radius.LG)
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -158,84 +165,96 @@ export struct ProfilePage {
         }
 
         Row() {
-          this.profileTabButton('主题', ProfileTab.Topics)
-          this.profileTabButton('回帖', ProfileTab.Replies)
+          CompactSegmentedControl({
+            options: this.profileOptions(),
+            selectedIndex: this.selectedTab === ProfileTab.Topics ? 0 : 1,
+            onSelect: (index: number) => this.changeTab(index === 0 ? ProfileTab.Topics : ProfileTab.Replies)
+          })
+          Blank()
         }
         .width('100%')
       }
       .width('100%')
       .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.LG, bottom: Spacing.SM })
-      .backgroundColor(SemanticColors.surface())
+      .backgroundColor(Color.Transparent)
     }
-  }
-
-  @Builder
-  private profileTabButton(label: string, tab: ProfileTab) {
-    Button(label, { type: ButtonType.Normal, stateEffect: true })
-      .layoutWeight(1)
-      .height(40)
-      .fontSize(Typography.BODY)
-      .fontWeight(this.selectedTab === tab ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.selectedTab === tab ? $r('app.color.brand_primary') : SemanticColors.textSecondary())
-      .backgroundColor(this.selectedTab === tab ? $r('app.color.brand_soft') : Color.Transparent)
-      .borderRadius(Radius.PILL)
-      .onClick(() => this.changeTab(tab))
   }
 
   build() {
-    HdsNavigation() {
-      Column() {
-        if (!this.authenticated) {
-          Column() {
-            this.loginGate()
-          }
-          .layoutWeight(1)
-          .width('100%')
-          .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXL,
-            bottom: this.bottomContentInset })
-        } else if (this.resolvingProfile && this.user === undefined) {
-          Column({ space: Spacing.SM }) {
-            LoadingProgress().width(30).height(30).color($r('app.color.brand_primary'))
-            Text('正在读取个人主页')
-              .fontSize(Typography.BODY)
-              .fontColor(SemanticColors.textSecondary())
-          }
-          .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
-          .padding({ bottom: this.bottomContentInset })
-        } else if (this.profileError.length > 0) {
-          Column({ space: Spacing.MD }) {
-            Text(this.profileError).fontSize(Typography.BODY).fontColor(SemanticColors.textSecondary())
-            Button('重试', { type: ButtonType.Capsule }).onClick(() => this.resolveProfile(true))
-          }
-          .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
-          .padding({ bottom: this.bottomContentInset })
-        } else {
-          this.profileHeader()
-          PaginatedTopicList({
-            viewModel: this.profileViewModel,
-            bottomInset: this.bottomContentInset,
-            semanticPrefix: 'profile',
-            emptyTitle: this.selectedTab === ProfileTab.Replies ? '还没有回帖' : '还没有主题',
-            onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
-            onRetry: () => this.resolveProfile(true)
-          })
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      HdsNavigation() {
+        Column() {
+          if (!this.authenticated) {
+            Column() {
+              this.loginGate()
+              Blank()
+            }
             .layoutWeight(1)
+            .width('100%')
+            .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXL,
+              bottom: this.bottomContentInset })
+          } else if (this.resolvingProfile && this.user === undefined) {
+            Column({ space: Spacing.SM }) {
+              LoadingProgress().width(30).height(30).color($r('app.color.brand_primary'))
+              Text('正在读取个人主页')
+                .fontSize(Typography.BODY)
+                .fontColor(SemanticColors.textSecondary())
+            }
+            .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
+            .padding({ bottom: this.bottomContentInset })
+          } else if (this.profileError.length > 0) {
+            Column({ space: Spacing.MD }) {
+              Text(this.profileError).fontSize(Typography.BODY).fontColor(SemanticColors.textSecondary())
+              Button('重试', { type: ButtonType.Capsule }).onClick(() => this.resolveProfile(true))
+            }
+            .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
+            .padding({ bottom: this.bottomContentInset })
+          } else {
+            this.profileHeader()
+            PaginatedTopicList({
+              viewModel: this.profileViewModel,
+              bottomInset: this.bottomContentInset,
+              semanticPrefix: 'profile',
+              emptyTitle: this.selectedTab === ProfileTab.Replies ? '还没有回帖' : '还没有主题',
+              onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
+              onRetry: () => this.resolveProfile(true)
+            })
+              .layoutWeight(1)
+          }
         }
+        .id('profile-page')
+        .width('100%').height('100%')
+        .backgroundColor(SemanticColors.page())
       }
-      .id('profile-page')
+      .titleBar({
+        avoidLayoutSafeArea: requiresHdsLayoutSafeAreaAvoidance(ImmersiveLightArea.TITLE_BAR),
+        enableComponentSafeArea: requiresHdsComponentSafeArea(ImmersiveLightArea.TITLE_BAR),
+        style: buildImmersiveTitleBarStyle(),
+        content: { stackBuilder: () => { this.titleBar(); } }
+      })
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .mode(NavigationMode.Stack)
+      .hideBackButton(true)
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%').height('100%')
-      .backgroundColor(SemanticColors.page())
+
+      HomeFab({
+        icon: $r('sys.symbol.gearshape_fill'),
+        semanticId: 'profile-settings-fab',
+        semanticLabel: '设置',
+        onAction: () => this.onOpenSettings(),
+        maxDragX: Math.max(0, this.contentWidth - PageMetrics.FAB_SIZE - Spacing.XXXL),
+        maxDragY: Math.max(0, this.contentHeight - PageMetrics.TOP_BAR_HEIGHT - this.bottomContentInset -
+          PageMetrics.FAB_SIZE - Spacing.XXXL)
+      })
+        .margin({ right: Spacing.LG, bottom: this.bottomContentInset + Spacing.XXXL + Spacing.SM })
+        .zIndex(4)
     }
-    .titleBar({
-      avoidLayoutSafeArea: requiresHdsLayoutSafeAreaAvoidance(ImmersiveLightArea.TITLE_BAR),
-      enableComponentSafeArea: requiresHdsComponentSafeArea(ImmersiveLightArea.TITLE_BAR),
-      style: buildImmersiveTitleBarStyle(),
-      content: { stackBuilder: () => { this.titleBar(); } }
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.contentWidth = Number(newArea.width);
+      this.contentHeight = Number(newArea.height);
     })
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .mode(NavigationMode.Stack)
-    .hideBackButton(true)
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .width('100%').height('100%')
+    .backgroundColor(SemanticColors.page())
   }
 }

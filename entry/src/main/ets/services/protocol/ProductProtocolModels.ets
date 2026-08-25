@@ -19,6 +19,9 @@ export interface HomeProtocolTopic {
 export interface HomeProtocolForum {
   forumId: number;
   name: string;
+  description?: string;
+  topicCount?: number;
+  colorHex?: string;
 }
 
 export interface HomeProtocolUser {

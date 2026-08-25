@@ -19,6 +19,9 @@ export interface TopicSummary {
 export interface ForumSummary {
   forumId: number;
   name: string;
+  description?: string;
+  topicCount?: number;
+  colorHex?: string;
 }
 
 export interface CurrentUserSummary {

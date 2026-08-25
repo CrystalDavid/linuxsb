@@ -52,7 +52,13 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
       });
     }
     for (let index = 0; index < decoded.forums.length; index++) {
-      forums.push({ forumId: decoded.forums[index].forumId, name: decoded.forums[index].name });
+      forums.push({
+        forumId: decoded.forums[index].forumId,
+        name: decoded.forums[index].name,
+        description: decoded.forums[index].description,
+        topicCount: decoded.forums[index].topicCount,
+        colorHex: decoded.forums[index].colorHex
+      });
     }
     let currentUser: HomeProtocolUser | undefined = undefined;
     if (decoded.currentUser !== undefined) {

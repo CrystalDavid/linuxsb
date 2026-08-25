@@ -1,5 +1,6 @@
 import { webview } from '@kit.ArkWeb';
 import { AppSpacing, AppTypography } from '../../common/theme/AppTheme';
+import { SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { CookieProbeSummary, cookieSessionBroker } from './CookieSessionBroker';
 
 const LOGIN_URL = 'https://linux.sb/login';
@@ -9,6 +10,7 @@ export struct OfficialLoginPage {
   onClose: () => void = () => {};
   showDiagnostics: boolean = false;
   private controller: webview.WebviewController = new webview.WebviewController('official-login');
+  @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
   @State private authPresent: boolean = false;
   @State private csrfPresent: boolean = false;
   @State private cookieHeaderLength: number = 0;
@@ -53,17 +55,12 @@ export struct OfficialLoginPage {
   build() {
     Column() {
       Row({ space: AppSpacing.SM }) {
-        Column({ space: AppSpacing.XXS }) {
-          Text('LinuxSB 官方登录')
-            .fontSize(AppTypography.TITLE)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Text('临时网页登录 · 应用不收集账号、密码或验证码')
-            .fontSize(AppTypography.CAPTION)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
+        Text('LinuxSB 官方登录')
+          .id('official-login-title')
+          .fontSize(AppTypography.TITLE)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
 
         Button(this.closing ? '正在返回' : '完成并返回')
           .id('official-login-complete')
@@ -71,7 +68,14 @@ export struct OfficialLoginPage {
           .onClick(() => this.finish())
       }
       .width('100%')
-      .padding({ left: AppSpacing.MD, right: AppSpacing.MD, top: AppSpacing.SM, bottom: AppSpacing.XS })
+      .height(this.topInset + 64)
+      .padding({
+        left: AppSpacing.MD,
+        right: AppSpacing.MD,
+        top: this.topInset + AppSpacing.XS,
+        bottom: AppSpacing.XS
+      })
+      .alignItems(VerticalAlign.Center)
       .backgroundColor($r('app.color.surface'))
 
       if (this.showDiagnostics) {

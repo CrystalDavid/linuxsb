@@ -1,6 +1,9 @@
 export interface ForumProbeSummary {
   forumId: number;
   name: string;
+  description?: string;
+  topicCount?: number;
+  colorHex?: string;
 }
 
 export interface CurrentUserProbeSummary {

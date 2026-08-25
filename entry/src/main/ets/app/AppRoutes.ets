@@ -7,6 +7,7 @@ import {
 export const TOPIC_ROUTE: string = 'TopicDetail';
 export const DIAGNOSTICS_ROUTE: string = 'P0Diagnostics';
 export const COMPOSE_ROUTE: string = 'ComposeTopic';
+export const SETTINGS_ROUTE: string = 'Settings';
 
 export interface TopicRouteParam {
   topicId: number;

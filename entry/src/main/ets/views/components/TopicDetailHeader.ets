@@ -1,11 +1,18 @@
 import { SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import { resolveTopicDetailHeaderMode, TopicDetailHeaderMode } from '../../common/ui/TopicDetailHeaderState';
+import {
+  ImmersiveIconButton,
+  TITLE_BAR_BACK_BUTTON_SIZE,
+  TITLE_BAR_BACK_ICON_SIZE,
+  TITLE_BAR_BACK_ICON_WEIGHT
+} from './ImmersiveIconButton';
 
 @Component
 export struct TopicDetailHeader {
   @Prop summaryVisible: boolean = true;
   @Prop title: string = '';
   @Prop categoryName: string = '';
+  onBack: () => void = () => {};
   onTitleClick: () => void = () => {};
 
   private showsSummaryLabel(): boolean {
@@ -14,7 +21,15 @@ export struct TopicDetailHeader {
 
   build() {
     Row({ space: 8 }) {
-      Blank().width(40).height(40)
+      ImmersiveIconButton({
+        semanticId: 'topic-back',
+        semanticLabel: '返回',
+        icon: $r('sys.symbol.chevron_left'),
+        buttonSize: TITLE_BAR_BACK_BUTTON_SIZE,
+        iconSize: TITLE_BAR_BACK_ICON_SIZE,
+        iconWeight: TITLE_BAR_BACK_ICON_WEIGHT,
+        onAction: () => this.onBack()
+      })
       Stack({ alignContent: Alignment.Start }) {
         Text('帖子详情')
           .id('topic-header-summary-label')
@@ -60,6 +75,7 @@ export struct TopicDetailHeader {
     .width('100%')
     .height(56)
     .justifyContent(FlexAlign.Start)
-    .padding({ left: 16, right: 16 })
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 10, right: 16 })
   }
 }

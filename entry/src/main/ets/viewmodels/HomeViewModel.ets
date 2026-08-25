@@ -97,6 +97,7 @@ export class HomeViewModel {
     if (append) {
       const ids = new Set<number>();
       const merged: TopicSummary[] = [];
+      const fresh: TopicSummary[] = [];
       for (let index = 0; index < this.topics.length; index++) {
         ids.add(this.topics[index].topicId);
         merged.push(this.topics[index]);
@@ -105,13 +106,19 @@ export class HomeViewModel {
         if (!ids.has(feed.topics[index].topicId)) {
           ids.add(feed.topics[index].topicId);
           merged.push(feed.topics[index]);
+          fresh.push(feed.topics[index]);
         }
       }
       this.topics = merged;
+      if (this.presentationTopics.length + fresh.length === merged.length) {
+        this.presentationTopics = this.presentationTopics.concat(this.mapper.mapSummaries(fresh));
+      } else {
+        this.presentationTopics = this.mapper.mapSummaries(merged);
+      }
     } else {
       this.topics = feed.topics;
+      this.presentationTopics = this.mapper.mapSummaries(this.topics);
     }
-    this.presentationTopics = this.mapper.mapSummaries(this.topics);
     this.protocolVersion = feed.protocolVersion;
     this.currentPage = feed.currentPage ?? 1;
     this.totalPages = feed.totalPages ?? Math.max(1, this.currentPage);
@@ -126,17 +133,29 @@ export class HomeViewModel {
 
   private mergeForums(existing: ForumSummary[], incoming: ForumSummary[]): ForumSummary[] {
     const output: ForumSummary[] = [];
-    const ids = new Set<number>();
     for (let index = 0; index < existing.length; index++) {
-      if (!ids.has(existing[index].forumId)) {
-        ids.add(existing[index].forumId);
-        output.push(existing[index]);
-      }
+      output.push(existing[index]);
     }
     for (let index = 0; index < incoming.length; index++) {
-      if (!ids.has(incoming[index].forumId)) {
-        ids.add(incoming[index].forumId);
+      let existingIndex = -1;
+      for (let candidate = 0; candidate < output.length; candidate++) {
+        if (output[candidate].forumId === incoming[index].forumId) {
+          existingIndex = candidate;
+          break;
+        }
+      }
+      if (existingIndex < 0) {
         output.push(incoming[index]);
+      } else {
+        const previous = output[existingIndex];
+        const update = incoming[index];
+        output[existingIndex] = {
+          forumId: previous.forumId,
+          name: update.name.length > 0 ? update.name : previous.name,
+          description: (update.description ?? '').length > 0 ? update.description : previous.description,
+          topicCount: update.topicCount ?? previous.topicCount,
+          colorHex: (update.colorHex ?? '').length > 0 ? update.colorHex : previous.colorHex
+        };
       }
     }
     return output;

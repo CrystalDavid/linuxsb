@@ -1,7 +1,13 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
-import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import {
+  HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY,
+  HomeTopicListLayoutMode
+} from '../../common/theme/HomeTopicListLayout';
+import { TopicListLayoutVariant } from '../../common/theme/TopicListStylePrefs';
 import { immersiveTitleBarContentTopSpacer } from '../../common/ui/ImmersiveTitleBarLayout';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
+import { shouldAutoLoadNextHomePage } from '../../common/ui/HomePaginationPolicy';
 import {
   ImmersiveLightArea,
   requiresHdsComponentSafeArea,
@@ -13,10 +19,12 @@ import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { LoadStateView } from '../components/LoadStateView';
+import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
 import { TopicListDataSource } from '../components/TopicListDataSource';
 import { TopicListItem } from '../components/TopicListItem';
+import { HomeFab } from '../components/HomeFab';
 
-@Component
+@Component({ freezeWhenInactive: true })
 export struct HomePage {
   @ObjectLink viewModel: HomeViewModel;
   debugAvailable: boolean = false;
@@ -25,12 +33,19 @@ export struct HomePage {
   onOpenDiagnostics: () => void = () => {};
   onPrefetch: (topicIds: number[]) => void = () => {};
   onCancelPrefetch: () => void = () => {};
+  onCompose: () => void = () => {};
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
+  @StorageLink(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY) private homeTopicListLayout: string =
+    HomeTopicListLayoutMode.TitleFirst;
   @State private selectedSort: FeedSort = FeedSort.NewComments;
-  @State private visibleTopics: TopicUiModel[] = [];
+  @State private contentWidth: number = 0;
+  @State private contentHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private topicDataSource: TopicListDataSource = new TopicListDataSource();
   private lastPrefetchKey: string = '';
+  private firstVisibleTopicIndex: number = 0;
+  private listIsScrolling: boolean = false;
+  private lastAutoLoadTopicCount: number = -1;
 
   aboutToAppear(): void {
     this.syncPresentation();
@@ -60,20 +75,32 @@ export struct HomePage {
   }
 
   private async loadMore(): Promise<void> {
+    const previousCount = this.topicDataSource.totalCount();
     await this.viewModel.loadMore();
-    this.syncPresentation();
+    if (this.viewModel.presentationTopics.length < previousCount) {
+      this.syncPresentation();
+      return;
+    }
+    this.topicDataSource.appendUnique(this.viewModel.presentationTopics.slice(previousCount));
+    if (!this.listIsScrolling) {
+      this.prefetchFrom(this.firstVisibleTopicIndex);
+    }
   }
 
   private syncPresentation(): void {
-    this.visibleTopics = this.viewModel.presentationTopics.slice();
-    this.topicDataSource.replace(this.visibleTopics);
-    this.prefetchFrom(0);
+    this.topicDataSource.reset(this.viewModel.presentationTopics);
+    this.firstVisibleTopicIndex = 0;
+    this.lastAutoLoadTopicCount = -1;
+    if (!this.listIsScrolling) {
+      this.prefetchFrom(0);
+    }
   }
 
   private prefetchFrom(firstVisible: number): void {
     const ids: number[] = [];
-    for (let index = Math.max(0, firstVisible); index < this.visibleTopics.length && ids.length < 3; index++) {
-      ids.push(this.visibleTopics[index].topicId);
+    const topics = this.topicDataSource.getAll();
+    for (let index = Math.max(0, firstVisible); index < topics.length && ids.length < 2; index++) {
+      ids.push(topics[index].topicId);
     }
     const key = ids.join(',');
     if (key === this.lastPrefetchKey) {
@@ -83,25 +110,18 @@ export struct HomePage {
     this.onPrefetch(ids);
   }
 
-  @Builder
-  private sortButton(label: string, sort: FeedSort) {
-    Button(label, { type: ButtonType.Capsule, stateEffect: true })
-      .id(sort === FeedSort.NewComments ? 'home-sort-comments' : 'home-sort-topics')
-      .height(32)
-      .padding({ left: Spacing.MD, right: Spacing.MD })
-      .fontSize(Typography.CAPTION)
-      .fontWeight(this.selectedSort === sort ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.selectedSort === sort ? $r('app.color.brand_primary') : SemanticColors.textSecondary())
-      .backgroundColor(this.selectedSort === sort ? $r('app.color.brand_soft') : Color.Transparent)
-      .borderRadius(Radius.PILL)
-      .onClick(() => this.changeSort(sort))
+  private sortOptions(): SegmentOption[] {
+    return [
+      new SegmentOption('新评论', 'home-sort-comments'),
+      new SegmentOption('新帖子', 'home-sort-topics')
+    ];
   }
 
   @Builder
   private titleBarContent() {
     Row({ space: Spacing.SM }) {
       Text('烧饼社区')
-        .fontSize(Typography.TITLE)
+        .fontSize(Typography.TITLE_LARGE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .maxLines(1)
@@ -114,8 +134,14 @@ export struct HomePage {
             })
         )
         .layoutWeight(1)
-      this.sortButton('新评论', FeedSort.NewComments)
-      this.sortButton('新帖子', FeedSort.NewTopics)
+      CompactSegmentedControl({
+        options: this.sortOptions(),
+        selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
+        segmentWidth: 66,
+        controlHeight: 36,
+        labelFontSize: Typography.LABEL,
+        onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
+      })
     }
     .width('100%')
     .height('100%')
@@ -139,44 +165,75 @@ export struct HomePage {
       .width('100%')
       .height(54)
       .justifyContent(FlexAlign.Center)
-      .onAppear(() => this.loadMore())
       .onClick(() => this.loadMore())
     }
     Column().height(this.bottomContentInset)
   }
 
   @Builder
+  private homeTopicItem(topic: TopicUiModel, layoutVariant: TopicListLayoutVariant) {
+    TopicListItem({
+      topic: topic,
+      layoutVariant: layoutVariant,
+      contentHorizontalPadding: PageMetrics.HORIZONTAL_PADDING,
+      semanticId: this.topicDataSource.totalCount() > 0 &&
+        this.topicDataSource.getData(0).topicId === topic.topicId ?
+        'home-first-topic' : `topic-item-${topic.topicId}`,
+      onTopicClick: (selected: TopicUiModel) => this.onTopicSelected(selected)
+    })
+  }
+
+  @Builder
   private homeContent() {
-    Stack() {
+    Stack({ alignContent: Alignment.BottomEnd }) {
       Refresh({ refreshing: this.viewModel.refreshing, promptText: '刷新中' }) {
         List({ scroller: this.listScroller }) {
           ListItem() {
             Column().width('100%').height(immersiveTitleBarContentTopSpacer(this.topInset))
           }
-          LazyForEach(this.topicDataSource, (topic: TopicUiModel) => {
-            TopicListItem({
-              topic: topic,
-              contentHorizontalPadding: PageMetrics.HORIZONTAL_PADDING,
-              semanticId: this.visibleTopics.length > 0 && this.visibleTopics[0].topicId === topic.topicId ?
-                'home-first-topic' : `topic-item-${topic.topicId}`,
-              onTopicClick: (selected: TopicUiModel) => this.onTopicSelected(selected)
-            })
-          }, (topic: TopicUiModel) => topic.topicId.toString())
-          if (this.visibleTopics.length > 0) {
+          if (this.homeTopicListLayout === HomeTopicListLayoutMode.AuthorFirst) {
+            LazyForEach(this.topicDataSource, (topic: TopicUiModel) => {
+              this.homeTopicItem(topic, TopicListLayoutVariant.AuthorHeader)
+            }, (topic: TopicUiModel) => `${topic.topicId}-author-first`)
+          } else {
+            LazyForEach(this.topicDataSource, (topic: TopicUiModel) => {
+              this.homeTopicItem(topic, TopicListLayoutVariant.ThreeMetadataRows)
+            }, (topic: TopicUiModel) => `${topic.topicId}-title-first`)
+          }
+          if (this.topicDataSource.totalCount() > 0) {
             ListItem() { this.listFooter() }
           }
         }
         .id('home-topic-list')
+        .accessibilityText(`首页主题列表，第${this.viewModel.currentPage}页，已加载${this.topicDataSource.totalCount()}条`)
         .width('100%')
         .height(`calc(100% + ${immersiveTitleBarContentTopSpacer(this.topInset)}vp)`)
         .position({ x: 0, y: -immersiveTitleBarContentTopSpacer(this.topInset) })
         .clip(false)
         .scrollBar(BarState.Off)
+        .cachedCount(6)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onScrollIndex((start: number, _end: number) => {
-          this.prefetchFrom(Math.max(0, start - 1));
+        .onScrollStart(() => {
+          this.listIsScrolling = true;
+          this.lastPrefetchKey = '';
+          this.onCancelPrefetch();
+        })
+        .onScrollIndex((start: number, end: number) => {
+          this.firstVisibleTopicIndex = Math.max(0, start - 1);
+          const topicCount = this.topicDataSource.totalCount();
+          if (shouldAutoLoadNextHomePage(end, topicCount, this.viewModel.hasMore(),
+            this.viewModel.loadingMore, this.lastAutoLoadTopicCount)) {
+            this.lastAutoLoadTopicCount = topicCount;
+            this.loadMore();
+          }
+        })
+        .onScrollStop(() => {
+          this.listIsScrolling = false;
+          this.prefetchFrom(this.firstVisibleTopicIndex);
         })
       }
+      .id(this.homeTopicListLayout === HomeTopicListLayoutMode.AuthorFirst ?
+        'home-layout-author-first-active' : 'home-layout-title-first-active')
       .width('100%').height('100%')
       .clip(false)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -198,9 +255,22 @@ export struct HomePage {
         })
           .padding({ top: immersiveTitleBarContentTopSpacer(this.topInset), bottom: this.bottomContentInset })
       }
+
+      HomeFab({
+        onAction: () => this.onCompose(),
+        maxDragX: Math.max(0, this.contentWidth - PageMetrics.FAB_SIZE - Spacing.XXXL),
+        maxDragY: Math.max(0, this.contentHeight - this.topInset - this.bottomContentInset -
+          PageMetrics.FAB_SIZE - Spacing.XXXL)
+      })
+        .margin({ right: Spacing.LG, bottom: this.bottomContentInset + Spacing.XXXL + Spacing.SM })
+        .zIndex(4)
     }
     .id('home-page')
     .width('100%').height('100%')
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.contentWidth = Number(newArea.width);
+      this.contentHeight = Number(newArea.height);
+    })
     .backgroundColor(SemanticColors.page())
   }
 

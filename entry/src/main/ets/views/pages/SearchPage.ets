@@ -1,5 +1,8 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import {
+  buildImmersiveGlassEffect
+} from '../../common/ui/ImmersiveActionBarStyle';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
@@ -10,9 +13,12 @@ import { FeedSearchField, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
+import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
+import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
+import { ImmersiveIconButton } from '../components/ImmersiveIconButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 
-@Component
+@Component({ freezeWhenInactive: true })
 export struct SearchPage {
   @ObjectLink viewModel: HomeViewModel;
   @Prop authenticated: boolean = false;
@@ -53,15 +59,23 @@ export struct SearchPage {
     .alignItems(VerticalAlign.Center)
   }
 
-  @Builder
-  private fieldChip(label: string, field: FeedSearchField) {
-    Button(label, { type: ButtonType.Capsule, stateEffect: true })
-      .height(30)
-      .padding({ left: Spacing.MD, right: Spacing.MD })
-      .fontSize(Typography.CAPTION)
-      .fontColor(this.field === field ? $r('app.color.brand_primary') : SemanticColors.textSecondary())
-      .backgroundColor(this.field === field ? $r('app.color.brand_soft') : Color.Transparent)
-      .onClick(() => { this.field = field; })
+  private fieldOptions(): SegmentOption[] {
+    return [
+      new SegmentOption('标题', 'search-field-title'),
+      new SegmentOption('正文', 'search-field-body'),
+      new SegmentOption('回帖', 'search-field-reply')
+    ];
+  }
+
+  private fieldIndex(): number {
+    if (this.field === FeedSearchField.Body) {
+      return 1;
+    }
+    return this.field === FeedSearchField.Reply ? 2 : 0;
+  }
+
+  private selectField(index: number): void {
+    this.field = index === 1 ? FeedSearchField.Body : (index === 2 ? FeedSearchField.Reply : FeedSearchField.Title);
   }
 
   @Builder
@@ -85,32 +99,36 @@ export struct SearchPage {
         .layoutWeight(1)
         .height(46)
         .padding({ left: Spacing.MD, right: Spacing.SM })
-        .backgroundColor(SemanticColors.surfaceMuted())
+        .backgroundEffect(buildImmersiveGlassEffect())
+        .border({ width: 1.1, color: $r('app.color.liquid_glass_highlight') })
         .borderRadius(Radius.PILL)
+        .shadow({ radius: 8, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
 
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.arrow_right'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .id('search-submit')
-        .width(44).height(44)
-        .backgroundColor($r('app.color.brand_primary'))
-        .onClick(() => this.search())
+        ImmersiveIconButton({
+          icon: $r('sys.symbol.arrow_right'),
+          semanticId: 'search-submit',
+          semanticLabel: '搜索',
+          buttonSize: 44,
+          iconSize: 20,
+          iconColor: $r('app.color.brand_primary'),
+          onAction: () => this.search()
+        })
       }
       .width('100%')
 
-      Row({ space: Spacing.XS }) {
-        this.fieldChip('标题', FeedSearchField.Title)
-        this.fieldChip('正文', FeedSearchField.Body)
-        this.fieldChip('回帖', FeedSearchField.Reply)
+      Row() {
+        CompactSegmentedControl({
+          options: this.fieldOptions(),
+          selectedIndex: this.fieldIndex(),
+          onSelect: (index: number) => this.selectField(index)
+        })
         Blank()
       }
       .width('100%')
     }
     .width('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.SM, bottom: Spacing.MD })
-    .backgroundColor(SemanticColors.surface())
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -123,23 +141,17 @@ export struct SearchPage {
         .fontSize(Typography.TITLE_SMALL)
         .fontWeight(FontWeight.Medium)
         .fontColor(SemanticColors.textPrimary())
-      Text('linux.sb 的站内搜索需要登录。登录只在临时官方页面完成。')
-        .fontSize(Typography.BODY)
-        .lineHeight(Typography.BODY_LINE_HEIGHT)
-        .fontColor(SemanticColors.textSecondary())
-        .textAlign(TextAlign.Center)
-      Button('打开官方登录页', { type: ButtonType.Capsule, stateEffect: true })
-        .height(44)
-        .fontColor(Color.White)
-        .backgroundColor($r('app.color.brand_primary'))
-        .onClick(() => this.onLogin())
+      ImmersiveGlassTextButton({
+        label: '打开官方登录页',
+        semanticId: 'search-login-action',
+        onAction: () => this.onLogin()
+      })
     }
     .id('search-login-required')
     .width('100%')
     .padding(Spacing.XL)
     .margin({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXL })
-    .backgroundColor(SemanticColors.surface())
-    .borderRadius(Radius.LG)
+    .backgroundColor(Color.Transparent)
   }
 
   build() {

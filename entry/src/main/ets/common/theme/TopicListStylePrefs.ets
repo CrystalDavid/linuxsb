@@ -5,11 +5,19 @@ export const TOPIC_LIST_LINE_HEIGHT_RATIO_KEY: string = 'topicListLineHeightRati
 export const TOPIC_LIST_ROW_PADDING_KEY: string = 'topicListRowPadding';
 export const TOPIC_LIST_AVATAR_SIZE_KEY: string = 'topicListAvatarSize';
 
-export const TITLE_FONT_SIZE_DEFAULT: number = 17;
-export const TITLE_FONT_WEIGHT_DEFAULT: number = 500;
+export const TITLE_FONT_SIZE_DEFAULT: number = 16;
+export const TITLE_FONT_WEIGHT_DEFAULT: number = 400;
+export const SECONDARY_FONT_SIZE_DEFAULT: number = 13;
 export const LINE_HEIGHT_RATIO_DEFAULT: number = 1.35;
 export const ROW_PADDING_DEFAULT: number = 8;
 export const AVATAR_SIZE_DEFAULT: number = 48;
+
+export enum TopicListLayoutVariant {
+  LegacyCompact = 0,
+  CurrentWithExpandedGap = 1,
+  ThreeMetadataRows = 2,
+  AuthorHeader = 3
+}
 
 export function titleLineHeight(fontSize: number = TITLE_FONT_SIZE_DEFAULT,
   ratio: number = LINE_HEIGHT_RATIO_DEFAULT): number {

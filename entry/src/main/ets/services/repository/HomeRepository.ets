@@ -123,7 +123,13 @@ export class HomeRepository implements HomeDataSourcePort {
     const forums: ForumSummary[] = [];
     const decodedForums = decoded.document.forums ?? [];
     for (let index = 0; index < decodedForums.length; index++) {
-      forums.push({ forumId: decodedForums[index].forumId, name: decodedForums[index].name });
+      forums.push({
+        forumId: decodedForums[index].forumId,
+        name: decodedForums[index].name,
+        description: decodedForums[index].description,
+        topicCount: decodedForums[index].topicCount,
+        colorHex: decodedForums[index].colorHex
+      });
     }
     let currentUser: CurrentUserSummary | undefined = undefined;
     if (decoded.document.currentUser !== undefined) {

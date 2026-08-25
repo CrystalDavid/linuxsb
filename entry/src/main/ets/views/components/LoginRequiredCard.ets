@@ -1,4 +1,5 @@
 import { AppColors, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { ImmersiveGlassTextButton } from './ImmersiveGlassTextButton';
 
 @Component
 export struct LoginRequiredCard {
@@ -10,8 +11,8 @@ export struct LoginRequiredCard {
     Column({ space: Spacing.SM }) {
       Row({ space: Spacing.MD }) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.lock'))
-            .fontSize(22)
+          SymbolGlyph($r('sys.symbol.person_badge_lock_fill'))
+            .fontSize(26)
             .fontColor([AppColors.brandPrimary()])
         }
         .width(42).height(42).borderRadius(Radius.PILL).backgroundColor(AppColors.brandSoft())
@@ -21,18 +22,18 @@ export struct LoginRequiredCard {
             .fontSize(Typography.BODY_LARGE)
             .fontWeight(FontWeight.Medium)
             .fontColor(SemanticColors.textPrimary())
-          Text('在 linux.sb 官方页面完成登录')
-            .fontSize(Typography.CAPTION)
-            .fontColor(SemanticColors.textSecondary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
-        Button('登录')
-          .fontColor(Color.White)
-          .backgroundColor(AppColors.brandPrimary())
-          .borderRadius(Radius.PILL)
-          .onClick(() => this.onLogin())
+        ImmersiveGlassTextButton({
+          label: '登录',
+          semanticId: 'topic-login-action',
+          controlHeight: 42,
+          horizontalPadding: Spacing.MD,
+          labelFontSize: Typography.LABEL,
+          onAction: () => this.onLogin()
+        })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)

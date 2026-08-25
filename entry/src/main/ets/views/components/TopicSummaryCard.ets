@@ -27,8 +27,8 @@ export struct TopicSummaryCard {
     }
     .id('topic-summary-card')
     .width('100%')
-    .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XL, bottom: Spacing.MD })
-    .backgroundColor(SemanticColors.surface())
+    .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXS, bottom: Spacing.MD })
+    .backgroundColor(Color.Transparent)
     .alignItems(HorizontalAlign.Start)
   }
 }

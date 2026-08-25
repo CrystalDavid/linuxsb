@@ -53,6 +53,34 @@ export default function probeDecoderTest() {
       expect(result.warnings.indexOf('TOPIC_FORUM_MISSING:9') >= 0).assertTrue();
     });
 
+    it('upgrades forum navigation entries with server color and topic count', 0, () => {
+      const fixture = '<link href="/app/assets/index.css?v=v8.6.5">' +
+        '<a class="forum-link" href="/forum/4">技术交流</a>' +
+        '<a class="forum-enhancements-link" style="--forum-enhancements-color:#00a9a5" href="/forum/4">' +
+        '<span class="forum-enhancements-link-main"><span class="forum-enhancements-name">技术交流</span></span>' +
+        '<span class="forum-enhancements-count">578</span></a><li class="empty-state"></li>';
+      const result = new HomeProbeDecoder().decode(fixture);
+      expect(result.protocolMatched).assertTrue();
+      expect(result.forums.length).assertEqual(1);
+      expect(result.forums[0].name).assertEqual('技术交流');
+      expect(result.forums[0].topicCount).assertEqual(578);
+      expect(result.forums[0].colorHex).assertEqual('#00a9a5');
+    });
+
+    it('decodes the selected forum public description without a DOM', 0, () => {
+      const fixture = '<link href="/app/assets/index.css?v=v8.6.5">' +
+        '<link rel="canonical" href="https://linux.sb/forum/4">' +
+        '<section class="forum-enhancements-forum-header"><div><h1>技术交流</h1>' +
+        '<span class="forum-enhancements-topic-count">578 个主题</span></div>' +
+        '<p class="forum-enhancements-description">编程、AI、建站、设计等互联网技术交流。</p></section>' +
+        '<li class="empty-state"></li>';
+      const result = new HomeProbeDecoder().decode(fixture);
+      expect(result.protocolMatched).assertTrue();
+      expect(result.forums.length).assertEqual(1);
+      expect(result.forums[0].description).assertEqual('编程、AI、建站、设计等互联网技术交流。');
+      expect(result.forums[0].topicCount).assertEqual(578);
+    });
+
     it('reports a home protocol mismatch instead of inventing data', 0, () => {
       const result = new HomeProbeDecoder().decode('<html><body><unknown-card /></body></html>');
       expect(result.protocolMatched).assertFalse();
