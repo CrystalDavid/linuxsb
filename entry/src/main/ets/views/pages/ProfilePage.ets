@@ -10,9 +10,9 @@ import { CurrentUserSummary, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicUiModel, UserUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
+import { AccountLoginGate } from '../components/AccountLoginGate';
 import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
 import { HomeFab } from '../components/HomeFab';
-import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 import { UserAvatar } from '../components/UserAvatar';
 
@@ -104,35 +104,14 @@ export struct ProfilePage {
   private titleBar() {
     Row() {
       Text('我的')
-        .fontSize(Typography.TITLE)
+        .id('profile-page-title')
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
     }
     .width('100%').height('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD })
     .alignItems(VerticalAlign.Center)
-  }
-
-  @Builder
-  private loginGate() {
-    Column({ space: Spacing.MD }) {
-      SymbolGlyph($r('sys.symbol.person_badge_lock_fill'))
-        .fontSize(54)
-        .fontColor([$r('app.color.brand_primary')])
-      Text('登录后查看个人主页')
-        .fontSize(Typography.TITLE_SMALL)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(SemanticColors.textPrimary())
-      ImmersiveGlassTextButton({
-        label: '打开官方登录页',
-        semanticId: 'profile-login-action',
-        onAction: () => this.onLogin()
-      })
-    }
-    .id('profile-login-required')
-    .width('100%')
-    .padding(Spacing.XL)
-    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -186,7 +165,11 @@ export struct ProfilePage {
         Column() {
           if (!this.authenticated) {
             Column() {
-              this.loginGate()
+              AccountLoginGate({
+                title: '登录后查看个人主页',
+                semanticPrefix: 'profile',
+                onLogin: () => this.onLogin()
+              })
               Blank()
             }
             .layoutWeight(1)

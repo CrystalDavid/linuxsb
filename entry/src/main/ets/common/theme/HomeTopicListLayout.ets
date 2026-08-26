@@ -17,6 +17,12 @@ export class HomeTopicListLayout {
     PersistentStorage.persistProp(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY, HomeTopicListLayoutMode.TitleFirst);
   }
 
+  static currentMode(): HomeTopicListLayoutMode {
+    const stored = AppStorage.get<string>(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY);
+    return stored === HomeTopicListLayoutMode.AuthorFirst ?
+      HomeTopicListLayoutMode.AuthorFirst : HomeTopicListLayoutMode.TitleFirst;
+  }
+
   static setMode(mode: HomeTopicListLayoutMode): void {
     if (AppStorage.has(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY)) {
       AppStorage.set(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY, mode);

@@ -1,7 +1,10 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import {
-  buildImmersiveGlassEffect
+  buildImmersiveGlassEffect,
+  IMMERSIVE_GLASS_BORDER_WIDTH,
+  IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
+  IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
@@ -13,10 +16,19 @@ import { FeedSearchField, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
+import { AccountLoginGate } from '../components/AccountLoginGate';
 import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
-import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
-import { ImmersiveIconButton } from '../components/ImmersiveIconButton';
+import {
+  GLASS_ACTION_ARROW_ICON_SIZE,
+  GLASS_ACTION_ARROW_ICON_WEIGHT,
+  ImmersiveIconButton
+} from '../components/ImmersiveIconButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
+
+const SEARCH_FIELD_SEGMENT_WIDTH: number = 52;
+const SEARCH_FIELD_CONTROL_HEIGHT: number = 32;
+const SEARCH_PRIMARY_CONTROL_HEIGHT: number = 42;
+const SEARCH_EMPTY_HINT_LIFT: number = 100;
 
 @Component({ freezeWhenInactive: true })
 export struct SearchPage {
@@ -50,7 +62,8 @@ export struct SearchPage {
   private titleBar() {
     Row() {
       Text('搜索')
-        .fontSize(Typography.TITLE)
+        .id('search-page-title')
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
     }
@@ -80,36 +93,44 @@ export struct SearchPage {
 
   @Builder
   private searchControls() {
-    Column({ space: Spacing.SM }) {
+    Column({ space: Spacing.LG }) {
       Row({ space: Spacing.SM }) {
-        Row({ space: Spacing.SM }) {
+        Row({ space: Spacing.XS }) {
           SymbolGlyph($r('sys.symbol.magnifyingglass'))
             .fontSize(20)
             .fontColor([SemanticColors.textSecondary()])
           TextInput({ text: this.query, placeholder: '搜索社区帖子' })
             .id('search-input')
             .layoutWeight(1)
-            .height(44)
+            .height(SEARCH_PRIMARY_CONTROL_HEIGHT - 2)
             .fontSize(Typography.BODY)
+            .padding({ left: 0, right: 0 })
             .backgroundColor(Color.Transparent)
             .enterKeyType(EnterKeyType.Search)
             .onChange((value: string) => { this.query = value; })
             .onSubmit(() => this.search())
         }
         .layoutWeight(1)
-        .height(46)
+        .id('search-input-surface')
+        .height(SEARCH_PRIMARY_CONTROL_HEIGHT)
         .padding({ left: Spacing.MD, right: Spacing.SM })
         .backgroundEffect(buildImmersiveGlassEffect())
-        .border({ width: 1.1, color: $r('app.color.liquid_glass_highlight') })
+        .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH, color: $r('app.color.bottom_tab_bar_highlight') })
         .borderRadius(Radius.PILL)
-        .shadow({ radius: 8, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
+        .shadow({
+          radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+          color: $r('app.color.bottom_tab_bar_shadow'),
+          offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+        })
 
         ImmersiveIconButton({
-          icon: $r('sys.symbol.arrow_right'),
+          icon: $r('sys.symbol.arrow_up'),
           semanticId: 'search-submit',
           semanticLabel: '搜索',
-          buttonSize: 44,
-          iconSize: 20,
+          buttonSize: SEARCH_PRIMARY_CONTROL_HEIGHT,
+          iconSize: GLASS_ACTION_ARROW_ICON_SIZE,
+          iconWeight: GLASS_ACTION_ARROW_ICON_WEIGHT,
+          iconRotation: 90,
           iconColor: $r('app.color.brand_primary'),
           onAction: () => this.search()
         })
@@ -120,6 +141,10 @@ export struct SearchPage {
         CompactSegmentedControl({
           options: this.fieldOptions(),
           selectedIndex: this.fieldIndex(),
+          segmentWidth: SEARCH_FIELD_SEGMENT_WIDTH,
+          controlHeight: SEARCH_FIELD_CONTROL_HEIGHT,
+          labelFontSize: Typography.BODY_SMALL,
+          semanticId: 'search-field-control',
           onSelect: (index: number) => this.selectField(index)
         })
         Blank()
@@ -127,66 +152,57 @@ export struct SearchPage {
       .width('100%')
     }
     .width('100%')
-    .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.SM, bottom: Spacing.MD })
-    .backgroundColor(Color.Transparent)
-  }
-
-  @Builder
-  private loginGate() {
-    Column({ space: Spacing.MD }) {
-      SymbolGlyph($r('sys.symbol.person_badge_lock_fill'))
-        .fontSize(34)
-        .fontColor([$r('app.color.brand_primary')])
-      Text('登录后搜索')
-        .fontSize(Typography.TITLE_SMALL)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(SemanticColors.textPrimary())
-      ImmersiveGlassTextButton({
-        label: '打开官方登录页',
-        semanticId: 'search-login-action',
-        onAction: () => this.onLogin()
-      })
-    }
-    .id('search-login-required')
-    .width('100%')
-    .padding(Spacing.XL)
-    .margin({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXL })
+    .padding({ left: Spacing.MD, right: Spacing.MD, top: 0, bottom: Spacing.MD })
     .backgroundColor(Color.Transparent)
   }
 
   build() {
     HdsNavigation() {
       Column() {
-        this.searchControls()
         if (!this.authenticated) {
-          this.loginGate()
-        } else if (!this.hasSearched && this.viewModel.state === ViewLoadState.Idle) {
-          Column({ space: Spacing.SM }) {
-            SymbolGlyph($r('sys.symbol.magnifyingglass'))
-              .fontSize(32)
-              .fontColor([SemanticColors.textTertiary()])
-            Text('输入关键词搜索标题、正文或回帖')
-              .fontSize(Typography.BODY)
-              .fontColor(SemanticColors.textSecondary())
+          Column() {
+            AccountLoginGate({
+              title: '登录后搜索',
+              semanticPrefix: 'search',
+              onLogin: () => this.onLogin()
+            })
+            Blank()
           }
           .layoutWeight(1)
           .width('100%')
-          .justifyContent(FlexAlign.Center)
+          .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XXL,
+            bottom: this.bottomContentInset })
         } else {
-          PaginatedTopicList({
-            viewModel: this.viewModel,
-            bottomInset: this.bottomContentInset,
-            semanticPrefix: 'search',
-            emptyTitle: '没有找到匹配的帖子',
-            onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
-            onRetry: () => this.search()
-          })
+          this.searchControls()
+          if (!this.hasSearched && this.viewModel.state === ViewLoadState.Idle) {
+            Column({ space: Spacing.SM }) {
+              SymbolGlyph($r('sys.symbol.magnifyingglass'))
+                .fontSize(32)
+                .fontColor([SemanticColors.textTertiary()])
+              Text('输入关键词搜索标题、正文或回帖')
+                .fontSize(Typography.BODY)
+                .fontColor(SemanticColors.textSecondary())
+            }
+            .id('search-empty-hint')
             .layoutWeight(1)
+            .width('100%')
+            .justifyContent(FlexAlign.Center)
+            .translate({ y: -SEARCH_EMPTY_HINT_LIFT })
+          } else {
+            PaginatedTopicList({
+              viewModel: this.viewModel,
+              bottomInset: this.bottomContentInset,
+              semanticPrefix: 'search',
+              emptyTitle: '没有找到匹配的帖子',
+              onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
+              onRetry: () => this.search()
+            })
+              .layoutWeight(1)
+          }
         }
       }
       .id('search-page')
       .width('100%').height('100%')
-      .padding({ bottom: this.authenticated && this.hasSearched ? 0 : this.bottomContentInset })
       .backgroundColor(SemanticColors.page())
     }
     .titleBar({

@@ -1,5 +1,6 @@
 import { webview } from '@kit.ArkWeb';
 import { AppSpacing, AppTypography } from '../../common/theme/AppTheme';
+import { Typography } from '../../common/theme/DesignSystem';
 import { SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { CookieProbeSummary, cookieSessionBroker } from './CookieSessionBroker';
 
@@ -57,7 +58,7 @@ export struct OfficialLoginPage {
       Row({ space: AppSpacing.SM }) {
         Text('LinuxSB 官方登录')
           .id('official-login-title')
-          .fontSize(AppTypography.TITLE)
+          .fontSize(Typography.PAGE_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)

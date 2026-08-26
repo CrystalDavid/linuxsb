@@ -16,7 +16,7 @@ struct PostImageBlock {
     if (this.failed) {
       Row({ space: Spacing.SM }) {
         Text('图')
-          .fontSize(14)
+          .fontSize(Typography.BODY_SMALL)
           .fontWeight(FontWeight.Medium)
           .fontColor(SemanticColors.textSecondary())
           .width(28)

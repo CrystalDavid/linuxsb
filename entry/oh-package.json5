@@ -1,9 +1,9 @@
 {
   "name": "entry",
   "version": "1.0.0",
-  "description": "Please describe the basic information.",
+  "description": "Main HarmonyOS application module for Shaobing Community.",
   "main": "",
-  "author": "",
+  "author": "CrystalDavid",
   "license": "",
   "dependencies": {}
 }

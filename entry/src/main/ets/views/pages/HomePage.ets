@@ -19,7 +19,13 @@ import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { LoadStateView } from '../components/LoadStateView';
-import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
+import {
+  CompactSegmentedControl,
+  SegmentOption,
+  TITLE_BAR_SEGMENT_HEIGHT,
+  TITLE_BAR_SEGMENT_LABEL_SIZE,
+  TITLE_BAR_SEGMENT_WIDTH
+} from '../components/CompactSegmentedControl';
 import { TopicListDataSource } from '../components/TopicListDataSource';
 import { TopicListItem } from '../components/TopicListItem';
 import { HomeFab } from '../components/HomeFab';
@@ -121,7 +127,8 @@ export struct HomePage {
   private titleBarContent() {
     Row({ space: Spacing.SM }) {
       Text('烧饼社区')
-        .fontSize(Typography.TITLE_LARGE)
+        .id('home-page-title')
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .maxLines(1)
@@ -137,11 +144,13 @@ export struct HomePage {
       CompactSegmentedControl({
         options: this.sortOptions(),
         selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
-        segmentWidth: 66,
-        controlHeight: 36,
-        labelFontSize: Typography.LABEL,
+        segmentWidth: TITLE_BAR_SEGMENT_WIDTH,
+        controlHeight: TITLE_BAR_SEGMENT_HEIGHT,
+        labelFontSize: TITLE_BAR_SEGMENT_LABEL_SIZE,
+        semanticId: 'home-sort-control',
         onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
       })
+        .translate({ y: -2 })
     }
     .width('100%')
     .height('100%')

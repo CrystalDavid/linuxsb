@@ -1,4 +1,5 @@
 import { AppRadius, AppSpacing, AppTypography } from '../../common/theme/AppTheme';
+import { Typography } from '../../common/theme/DesignSystem';
 import { ContentBlock, ContentBlockKind } from '../../models/ContentBlock';
 
 @Component
@@ -47,7 +48,7 @@ export struct ContentBlockRenderer {
         } else if (block.kind === ContentBlockKind.CodeBlock) {
           Scroll() {
             Text(block.text)
-              .fontSize(13)
+              .fontSize(Typography.CODE)
               .fontColor($r('app.color.text_primary'))
               .fontFamily('monospace')
               .width('100%')

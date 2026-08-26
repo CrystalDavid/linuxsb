@@ -1,7 +1,10 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import {
-  buildImmersiveGlassEffect
+  buildImmersiveGlassEffect,
+  IMMERSIVE_GLASS_BORDER_WIDTH,
+  IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
+  IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
@@ -15,7 +18,6 @@ import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
 import {
   ImmersiveIconButton,
-  TITLE_BAR_BACK_BUTTON_SIZE,
   TITLE_BAR_BACK_ICON_SIZE,
   TITLE_BAR_BACK_ICON_WEIGHT
 } from '../components/ImmersiveIconButton';
@@ -108,13 +110,13 @@ export struct ComposeTopicPage {
         icon: $r('sys.symbol.chevron_left'),
         semanticId: 'compose-back',
         semanticLabel: '返回',
-        buttonSize: TITLE_BAR_BACK_BUTTON_SIZE,
         iconSize: TITLE_BAR_BACK_ICON_SIZE,
         iconWeight: TITLE_BAR_BACK_ICON_WEIGHT,
         onAction: () => this.onBack()
       })
       Text('发表主题')
-        .fontSize(Typography.TITLE)
+        .id('compose-page-title')
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .layoutWeight(1)
@@ -226,9 +228,14 @@ export struct ComposeTopicPage {
                 .width('100%').height(48)
                 .fontSize(Typography.BODY_LARGE)
                 .backgroundEffect(buildImmersiveGlassEffect())
-                .border({ width: 1.1, color: $r('app.color.liquid_glass_highlight') })
+                .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
+                  color: $r('app.color.bottom_tab_bar_highlight') })
                 .borderRadius(Radius.MD)
-                .shadow({ radius: 8, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
+                .shadow({
+                  radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+                  color: $r('app.color.bottom_tab_bar_shadow'),
+                  offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+                })
                 .onChange((value: string) => { this.title = value; })
               TextArea({ text: this.body, placeholder: '写下正文…' })
                 .id('compose-body')
@@ -237,9 +244,14 @@ export struct ComposeTopicPage {
                 .fontSize(Typography.BODY)
                 .lineHeight(Typography.READING_LINE_HEIGHT)
                 .backgroundEffect(buildImmersiveGlassEffect())
-                .border({ width: 1.1, color: $r('app.color.liquid_glass_highlight') })
+                .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
+                  color: $r('app.color.bottom_tab_bar_highlight') })
                 .borderRadius(Radius.MD)
-                .shadow({ radius: 8, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
+                .shadow({
+                  radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+                  color: $r('app.color.bottom_tab_bar_shadow'),
+                  offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+                })
                 .onChange((value: string) => { this.body = value; })
               if (this.resultMessage.length > 0) {
                 Text(this.resultMessage)

@@ -114,7 +114,7 @@ export struct TopicDetailPage {
       Row({ space: 8 }) {
         LoadingProgress().width(18).height(18).color(SemanticColors.textSecondary())
         Text('正在加载下一页')
-          .fontSize(13)
+          .fontSize(Typography.METADATA)
           .fontColor(SemanticColors.textSecondary())
       }
       .id('topic-load-more')
@@ -125,14 +125,14 @@ export struct TopicDetailPage {
       Button('下一页加载失败，点击重试')
         .id('topic-load-more-retry')
         .height(48)
-        .fontSize(13)
+        .fontSize(Typography.METADATA)
         .fontColor($r('app.color.brand_primary'))
         .backgroundColor(Color.Transparent)
         .onClick(() => this.viewModel.retryLoadMore())
     } else if (detail.nextPageUrl.length > 0 || this.viewModel.mountedReplyCount < detail.replies.length) {
       Button('继续向下加载')
         .id('topic-load-more-batch')
-        .fontSize(12)
+        .fontSize(Typography.CAPTION)
         .fontColor(SemanticColors.textTertiary())
         .width('100%')
         .height(40)
@@ -165,7 +165,7 @@ export struct TopicDetailPage {
       } else if (detail.advertisedReplyCount === 0) {
         ListItem() {
           Text('暂无回复')
-            .fontSize(14)
+            .fontSize(Typography.BODY_SMALL)
             .fontColor(SemanticColors.textSecondary())
             .width('100%')
             .height(72)
@@ -211,7 +211,7 @@ export struct TopicDetailPage {
       ListItem() {
         Column({ space: 12 }) {
           Text(this.displayTitle())
-            .fontSize(22)
+            .fontSize(Typography.PAGE_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor(SemanticColors.textPrimary())
             .maxLines(2)

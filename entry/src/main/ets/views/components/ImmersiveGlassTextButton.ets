@@ -1,5 +1,10 @@
 import { Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
-import { buildImmersiveGlassEffect } from '../../common/ui/ImmersiveActionBarStyle';
+import {
+  buildImmersiveGlassEffect,
+  IMMERSIVE_GLASS_BORDER_WIDTH,
+  IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
+  IMMERSIVE_GLASS_SHADOW_RADIUS
+} from '../../common/ui/ImmersiveActionBarStyle';
 
 @Component
 export struct ImmersiveGlassTextButton {
@@ -21,10 +26,14 @@ export struct ImmersiveGlassTextButton {
       .fontColor(this.actionEnabled ? $r('app.color.brand_primary') : SemanticColors.disabled())
       .backgroundColor(Color.Transparent)
       .backgroundEffect(buildImmersiveGlassEffect())
-      .borderWidth(1.25)
-      .borderColor($r('app.color.hds_floating_action_highlight'))
+      .borderWidth(IMMERSIVE_GLASS_BORDER_WIDTH)
+      .borderColor($r('app.color.bottom_tab_bar_highlight'))
       .borderRadius(Radius.PILL)
-      .shadow({ radius: 12, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
+      .shadow({
+        radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+        color: $r('app.color.bottom_tab_bar_shadow'),
+        offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+      })
       .hoverEffect(HoverEffect.None)
       .opacity(this.actionEnabled ? 1 : 0.55)
       .enabled(this.actionEnabled)

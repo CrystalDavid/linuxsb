@@ -28,7 +28,7 @@ export struct CategoryDrawer {
       Blank().layoutWeight(1)
       if (this.isDirty()) {
         Text('重置')
-          .fontSize(13)
+          .fontSize(Typography.METADATA)
           .fontColor(AppColors.brandPrimary())
           .padding({ left: 8, right: 8, top: 6, bottom: 6 })
           .onClick(() => {
@@ -116,7 +116,7 @@ export struct CategoryDrawer {
   private confirmBar() {
     Column({ space: 8 }) {
       Text(this.selectionSummary())
-        .fontSize(12)
+        .fontSize(Typography.CAPTION)
         .fontColor(SemanticColors.textSecondary())
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -126,7 +126,7 @@ export struct CategoryDrawer {
         .id('category-drawer-apply')
         .width('100%')
         .height(42)
-        .fontSize(15)
+        .fontSize(Typography.BODY)
         .fontWeight(FontWeight.Medium)
         .fontColor(Color.White)
         .backgroundColor(AppColors.brandPrimary())

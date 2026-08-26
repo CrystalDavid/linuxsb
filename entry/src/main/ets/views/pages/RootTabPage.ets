@@ -16,7 +16,7 @@ import {
   TopicRouteParam
 } from '../../app/AppRoutes';
 import { m1Runtime } from '../../app/M1Runtime';
-import { PageMetrics, SemanticColors } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import { SYS_BOTTOM_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
@@ -176,7 +176,7 @@ export struct RootTabPage {
   private diagnosticsTitleBar() {
     Row() {
       Text('P0 开发诊断')
-        .fontSize(20)
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
     }

@@ -1,7 +1,6 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
-import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
+import { PageMetrics, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import { ForumVisuals } from '../../common/theme/ForumVisuals';
-import { TITLE_FONT_SIZE_DEFAULT } from '../../common/theme/TopicListStylePrefs';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
@@ -12,7 +11,18 @@ import { FeedSort, ForumSummary, HomeFeedRequest } from '../../models/HomeModels
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
-import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
+import {
+  CompactSegmentedControl,
+  SegmentOption,
+  TITLE_BAR_SEGMENT_HEIGHT,
+  TITLE_BAR_SEGMENT_LABEL_SIZE,
+  TITLE_BAR_SEGMENT_WIDTH
+} from '../components/CompactSegmentedControl';
+import {
+  ImmersiveIconButton,
+  TITLE_BAR_BACK_ICON_SIZE,
+  TITLE_BAR_BACK_ICON_WEIGHT
+} from '../components/ImmersiveIconButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 
 @Component({ freezeWhenInactive: true })
@@ -96,8 +106,9 @@ export struct ForumsPage {
 
         Column({ space: 2 }) {
           Text(forum.name)
-            .fontSize(TITLE_FONT_SIZE_DEFAULT)
-            .fontWeight(FontWeight.Normal)
+            .id(first ? 'forum-first-title' : `forum-title-${forum.forumId}`)
+            .fontSize(Typography.TOPIC_TITLE)
+            .fontWeight(500)
             .fontColor(SemanticColors.textPrimary())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -141,23 +152,35 @@ export struct ForumsPage {
   private titleBar() {
     Row({ space: Spacing.SM }) {
       if (this.selectedForumId > 0) {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.chevron_left'))
-            .fontSize(21)
-            .fontColor([SemanticColors.textPrimary()])
-        }
-        .id('forums-back')
-        .width(40).height(40)
-        .backgroundColor(Color.Transparent)
-        .onClick(() => this.showForumDirectory())
+        ImmersiveIconButton({
+          icon: $r('sys.symbol.chevron_left'),
+          semanticId: 'forums-back',
+          semanticLabel: '返回板块目录',
+          iconSize: TITLE_BAR_BACK_ICON_SIZE,
+          iconWeight: TITLE_BAR_BACK_ICON_WEIGHT,
+          onAction: () => this.showForumDirectory()
+        })
       }
       Text(this.selectedForumId > 0 ? this.selectedForumName() : '板块')
-        .fontSize(Typography.TITLE)
+        .id('forums-page-title')
+        .fontSize(Typography.PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
+      if (this.selectedForumId > 0) {
+        CompactSegmentedControl({
+          options: this.sortOptions(),
+          selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
+          segmentWidth: TITLE_BAR_SEGMENT_WIDTH,
+          controlHeight: TITLE_BAR_SEGMENT_HEIGHT,
+          labelFontSize: TITLE_BAR_SEGMENT_LABEL_SIZE,
+          semanticId: 'forums-sort-control',
+          onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
+        })
+          .translate({ y: -2 })
+      }
     }
     .width('100%').height('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD })
@@ -174,7 +197,9 @@ export struct ForumsPage {
         ListItem() { Column().height(this.bottomContentInset) }
       }
       .id('forum-directory')
-      .width('100%').height('100%')
+      .width('100%')
+      .height(`calc(100% + ${Spacing.MD}vp)`)
+      .position({ x: 0, y: -Spacing.MD })
       .scrollBar(BarState.Off)
     } else if (this.viewModel.state === ViewLoadState.Loading || this.viewModel.state === ViewLoadState.Idle) {
       Column({ space: Spacing.SM }) {
@@ -197,28 +222,15 @@ export struct ForumsPage {
 
   @Builder
   private forumTopics() {
-    Column({ space: Spacing.SM }) {
-      Row() {
-        CompactSegmentedControl({
-          options: this.sortOptions(),
-          selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
-          onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
-        })
-        Blank()
-      }
-      .width('100%')
-      .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.SM })
-
-      PaginatedTopicList({
-        viewModel: this.viewModel,
-        bottomInset: this.bottomContentInset,
-        semanticPrefix: 'forums',
-        emptyTitle: '这个板块还没有主题',
-        onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
-        onRetry: () => this.load(false)
-      })
-        .layoutWeight(1)
-    }
+    PaginatedTopicList({
+      viewModel: this.viewModel,
+      bottomInset: this.bottomContentInset,
+      semanticPrefix: 'forums',
+      emptyTitle: '这个板块还没有主题',
+      emphasizeTopicTitle: true,
+      onTopicSelected: (topic: TopicUiModel) => this.onTopicSelected(topic),
+      onRetry: () => this.load(false)
+    })
     .width('100%').height('100%')
   }
 

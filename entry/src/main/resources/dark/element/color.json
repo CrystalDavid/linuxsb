@@ -77,6 +77,14 @@
       "value": "#FF0B0F12"
     },
     {
+      "name": "settings_group_bg",
+      "value": "#FF151A20"
+    },
+    {
+      "name": "settings_preview_bg",
+      "value": "#FF20262D"
+    },
+    {
       "name": "divider",
       "value": "#1FFFFFFF"
     },
@@ -122,11 +130,11 @@
     },
     {
       "name": "bottom_tab_bar_bg",
-      "value": "#24FFFFFF"
+      "value": "#18000000"
     },
     {
       "name": "bottom_tab_bar_highlight",
-      "value": "#C2FFFFFF"
+      "value": "#1AFFFFFF"
     },
     {
       "name": "bottom_tab_bar_shadow",
@@ -138,23 +146,23 @@
     },
     {
       "name": "liquid_glass_bg",
-      "value": "#24FFFFFF"
+      "value": "#18000000"
     },
     {
       "name": "liquid_glass_highlight",
-      "value": "#C2FFFFFF"
+      "value": "#1AFFFFFF"
     },
     {
       "name": "liquid_segment_bg",
-      "value": "#24FFFFFF"
+      "value": "#18000000"
     },
     {
       "name": "liquid_segment_selected",
-      "value": "#2CFFFFFF"
+      "value": "#0A5B8FF9"
     },
     {
       "name": "bottom_tab_selected_bg",
-      "value": "#2CFFFFFF"
+      "value": "#0A5B8FF9"
     },
     {
       "name": "send_button_bg",
@@ -162,7 +170,7 @@
     },
     {
       "name": "hds_floating_action_bg",
-      "value": "#24FFFFFF"
+      "value": "#18000000"
     },
     {
       "name": "hds_floating_action_highlight",
@@ -174,11 +182,11 @@
     },
     {
       "name": "fab_compose_bg",
-      "value": "#FF78A8FF"
+      "value": "#FF5B8FF9"
     },
     {
       "name": "bottom_tab_selected_glow",
-      "value": "#50000000"
+      "value": "#245B8FF9"
     },
     {
       "name": "bottom_tab_foreground",

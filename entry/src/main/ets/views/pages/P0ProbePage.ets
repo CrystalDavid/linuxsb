@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
+import { Typography } from '../../common/theme/DesignSystem';
 import { LoginProbePage } from '../../services/auth/LoginProbePage';
 import { AuthenticatedSessionProbeResult, SessionProbe } from '../../services/auth/SessionProbe';
 import { ProbeDecodeTaskRunner } from '../../services/protocol/ProbeDecodeTask';
@@ -436,13 +437,13 @@ export struct P0ProbePage {
         Column({ space: 12 }) {
           Column({ space: 5 }) {
             Text('烧饼社区 · P0 技术验证')
-              .fontSize(26)
+              .fontSize(Typography.DISPLAY)
               .fontWeight(FontWeight.Bold)
             Text('非官方客户端 · 技术验证，不是正式 UI')
-              .fontSize(14)
+              .fontSize(Typography.BODY_SMALL)
               .fontColor('#B54708')
             Text(this.globalNote)
-              .fontSize(12)
+              .fontSize(Typography.CAPTION)
               .fontColor('#667085')
           }
           .width('100%')
@@ -451,25 +452,25 @@ export struct P0ProbePage {
 
           Column({ space: 10 }) {
             Text('P0-1 / P0-2  匿名首页与首页协议')
-              .fontSize(18)
+              .fontSize(Typography.SECTION_TITLE)
               .fontWeight(FontWeight.Bold)
               .width('100%')
-            Text(this.homeOutcome).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
-            Text(this.homeTransport).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.homeParse).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.homeOutcome).fontSize(Typography.BODY_SMALL).fontWeight(FontWeight.Medium).width('100%')
+            Text(this.homeTransport).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.homeParse).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
             if (this.homeVersion.length > 0) {
               Text(`BBS1：${this.homeVersion} · 主题数：${this.homeTopics.length}`)
-                .fontSize(13)
+                .fontSize(Typography.METADATA)
                 .width('100%')
             }
             ForEach(this.homeTopics.slice(0, 5), (item: HomeTopicProbeSummary) => {
               Text(`#${item.topicId}  ${item.title}  ·  ${item.forumName.length > 0 ? item.forumName : '版块缺失'}`)
-                .fontSize(12)
+                .fontSize(Typography.CAPTION)
                 .maxLines(2)
                 .width('100%')
             }, (item: HomeTopicProbeSummary) => item.topicId.toString())
             if (this.homeWarnings.length > 0) {
-              Text(this.homeWarnings).fontSize(11).fontColor('#B54708').width('100%')
+              Text(this.homeWarnings).fontSize(Typography.MICRO).fontColor('#B54708').width('100%')
             }
             Button(this.busyProbe === 'home' ? '请求中…' : '运行匿名首页 RCP')
               .enabled(this.busyProbe.length === 0)
@@ -483,7 +484,7 @@ export struct P0ProbePage {
 
           Column({ space: 10 }) {
             Text('P0-B  Topic 605 回复来源与解码契约')
-              .fontSize(18)
+              .fontSize(Typography.SECTION_TITLE)
               .fontWeight(FontWeight.Bold)
               .width('100%')
             TextInput({ text: this.topicIdText, placeholder: '公开主题 ID' })
@@ -493,36 +494,36 @@ export struct P0ProbePage {
               .id('diagnostics-open-formal-topic')
               .enabled(this.parseTopicId(this.topicIdText) > 0)
               .onClick(() => this.onOpenFormalTopic(this.parseTopicId(this.topicIdText)))
-            Text(this.topicOutcome).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
-            Text(this.topicTransport).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.topicParse).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.topicStructure).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.topicOutcome).fontSize(Typography.BODY_SMALL).fontWeight(FontWeight.Medium).width('100%')
+            Text(this.topicTransport).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.topicParse).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.topicStructure).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
             if (this.topicTitle.length > 0) {
-              Text(this.topicTitle).fontSize(14).fontWeight(FontWeight.Medium).width('100%')
-              Text(this.topicCounts).fontSize(12).fontColor('#475467').width('100%')
+              Text(this.topicTitle).fontSize(Typography.BODY_SMALL).fontWeight(FontWeight.Medium).width('100%')
+              Text(this.topicCounts).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
             }
             ForEach(this.topicReplies.slice(0, 8), (item: ReplyProbeSummary) => {
               Text(`回复 ID ${item.replyId} · 楼层 ${item.floor > 0 ? item.floor : '缺失'}`)
-                .fontSize(12)
+                .fontSize(Typography.CAPTION)
                 .width('100%')
             }, (item: ReplyProbeSummary) => item.replyId.toString())
             if (this.topicWarnings.length > 0) {
-              Text(this.topicWarnings).fontSize(11).fontColor('#B54708').width('100%')
+              Text(this.topicWarnings).fontSize(Typography.MICRO).fontColor('#B54708').width('100%')
             }
             Text(`登录后主题：${this.authenticatedTopicOutcome}`)
-              .fontSize(14)
+              .fontSize(Typography.BODY_SMALL)
               .fontWeight(FontWeight.Medium)
               .width('100%')
-            Text(this.authenticatedTopicTransport).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.authenticatedTopicCounts).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.authenticatedTopicReplyContract).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.authenticatedTopicParse).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.authenticatedTopicStructure).fontSize(12).fontColor('#475467').width('100%')
-            Text(this.authenticatedSnapshotStatus).fontSize(12).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicTransport).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicCounts).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicReplyContract).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicParse).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.authenticatedTopicStructure).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(this.authenticatedSnapshotStatus).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
             if (this.authenticatedTopicWarnings.length > 0) {
-              Text(this.authenticatedTopicWarnings).fontSize(11).fontColor('#B54708').width('100%')
+              Text(this.authenticatedTopicWarnings).fontSize(Typography.MICRO).fontColor('#B54708').width('100%')
             }
-            Text(this.topicComparison).fontSize(12).fontColor('#344054').width('100%')
+            Text(this.topicComparison).fontSize(Typography.CAPTION).fontColor('#344054').width('100%')
             Flex({ wrap: FlexWrap.Wrap }) {
               Button(this.busyProbe === 'topic' ? '请求中…' : '运行匿名 Topic 结构探针')
                 .enabled(this.busyProbe.length === 0)
@@ -542,17 +543,17 @@ export struct P0ProbePage {
 
           Column({ space: 10 }) {
             Text('P0-4 / P0-5 / P0-6  官方登录与会话衔接')
-              .fontSize(18)
+              .fontSize(Typography.SECTION_TITLE)
               .fontWeight(FontWeight.Bold)
               .width('100%')
             Text('ArkWeb 只在登录页打开期间存在；关闭后业务请求仍只走 RCP。')
-              .fontSize(12)
+              .fontSize(Typography.CAPTION)
               .fontColor('#475467')
               .width('100%')
-            Text(`Cookie 探针：${this.cookieOutcome}`).fontSize(14).width('100%')
-            Text(this.cookieSummary).fontSize(12).fontColor('#475467').width('100%')
-            Text(`登录后 RCP：${this.sessionOutcome}`).fontSize(14).width('100%')
-            Text(this.sessionSummary).fontSize(12).fontColor('#475467').width('100%')
+            Text(`Cookie 探针：${this.cookieOutcome}`).fontSize(Typography.BODY_SMALL).width('100%')
+            Text(this.cookieSummary).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
+            Text(`登录后 RCP：${this.sessionOutcome}`).fontSize(Typography.BODY_SMALL).width('100%')
+            Text(this.sessionSummary).fontSize(Typography.CAPTION).fontColor('#475467').width('100%')
             Flex({ wrap: FlexWrap.Wrap }) {
               Button('打开官方登录')
                 .margin({ right: 8, bottom: 8 })
@@ -574,11 +575,11 @@ export struct P0ProbePage {
 
           Column({ space: 10 }) {
             Text('P0-8  写契约保护')
-              .fontSize(18)
+              .fontSize(Typography.SECTION_TITLE)
               .fontWeight(FontWeight.Bold)
               .width('100%')
             Text(this.writeProbe.statusText)
-              .fontSize(13)
+              .fontSize(Typography.METADATA)
               .fontColor('#B42318')
               .width('100%')
             Button('发帖 / 回复（已禁用）')

@@ -77,6 +77,14 @@
       "value": "#FFF8FAFC"
     },
     {
+      "name": "settings_group_bg",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "settings_preview_bg",
+      "value": "#FFF1F4F7"
+    },
+    {
       "name": "divider",
       "value": "#18000000"
     },

@@ -1,13 +1,15 @@
 // Authorized geometry adaptation of ArkDO TopicListStylePrefs.ets at the fixed upstream commit.
+import { Typography } from './DesignSystem';
+
 export const TOPIC_LIST_TITLE_FONT_SIZE_KEY: string = 'topicListTitleFontSize';
 export const TOPIC_LIST_TITLE_FONT_WEIGHT_KEY: string = 'topicListTitleFontWeight';
 export const TOPIC_LIST_LINE_HEIGHT_RATIO_KEY: string = 'topicListLineHeightRatio';
 export const TOPIC_LIST_ROW_PADDING_KEY: string = 'topicListRowPadding';
 export const TOPIC_LIST_AVATAR_SIZE_KEY: string = 'topicListAvatarSize';
 
-export const TITLE_FONT_SIZE_DEFAULT: number = 16;
+export const TITLE_FONT_SIZE_DEFAULT: number = Typography.LIST_TITLE;
 export const TITLE_FONT_WEIGHT_DEFAULT: number = 400;
-export const SECONDARY_FONT_SIZE_DEFAULT: number = 13;
+export const SECONDARY_FONT_SIZE_DEFAULT: number = Typography.METADATA;
 export const LINE_HEIGHT_RATIO_DEFAULT: number = 1.35;
 export const ROW_PADDING_DEFAULT: number = 8;
 export const AVATAR_SIZE_DEFAULT: number = 48;

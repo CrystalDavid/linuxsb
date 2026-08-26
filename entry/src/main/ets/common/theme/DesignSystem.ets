@@ -28,19 +28,32 @@ export class SemanticColors {
 }
 
 export class Typography {
-  static readonly LABEL_SMALL: number = 11;
+  // Fixed text scale: every business-facing Text/Button/TextInput size maps to
+  // one of these 12 values. SymbolGlyph/icon geometry is intentionally separate.
+  static readonly MICRO: number = 11;
   static readonly CAPTION: number = 12;
-  static readonly LABEL: number = 13;
+  static readonly METADATA: number = 13;
+  static readonly BODY_SMALL: number = 14;
   static readonly BODY: number = 15;
-  static readonly BODY_LARGE: number = 17;
-  static readonly TITLE_SMALL: number = 18;
-  static readonly TITLE: number = 20;
-  static readonly TITLE_LARGE: number = 22;
+  static readonly LIST_TITLE: number = 16;
+  static readonly TOPIC_TITLE: number = 17;
+  static readonly SECTION_TITLE: number = 18;
+  static readonly CONTENT_TITLE: number = 20;
+  static readonly PAGE_TITLE: number = 22;
   static readonly HEADLINE: number = 24;
   static readonly DISPLAY: number = 26;
+
+  // Compatibility names keep older call sites readable while resolving to the
+  // same canonical scale above; they do not introduce additional font sizes.
+  static readonly LABEL_SMALL: number = Typography.MICRO;
+  static readonly LABEL: number = Typography.METADATA;
+  static readonly BODY_LARGE: number = Typography.TOPIC_TITLE;
+  static readonly TITLE_SMALL: number = Typography.SECTION_TITLE;
+  static readonly TITLE: number = Typography.CONTENT_TITLE;
+  static readonly TITLE_LARGE: number = Typography.PAGE_TITLE;
   static readonly BODY_LINE_HEIGHT: number = 23;
   static readonly READING_LINE_HEIGHT: number = 25;
-  static readonly CODE: number = 13;
+  static readonly CODE: number = Typography.METADATA;
 }
 
 export class Spacing {

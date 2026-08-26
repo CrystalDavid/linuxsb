@@ -1,3 +1,5 @@
+import { Typography } from './DesignSystem';
+
 export class AppSpacing {
   static readonly XXS: number = 4;
   static readonly XS: number = 8;
@@ -16,11 +18,11 @@ export class AppRadius {
 }
 
 export class AppTypography {
-  static readonly CAPTION: number = 12;
-  static readonly BODY: number = 15;
-  static readonly BODY_LARGE: number = 17;
-  static readonly TITLE: number = 20;
-  static readonly DISPLAY: number = 28;
+  static readonly CAPTION: number = Typography.CAPTION;
+  static readonly BODY: number = Typography.BODY;
+  static readonly BODY_LARGE: number = Typography.TOPIC_TITLE;
+  static readonly TITLE: number = Typography.CONTENT_TITLE;
+  static readonly DISPLAY: number = Typography.DISPLAY;
 }
 
 export class AppLayout {

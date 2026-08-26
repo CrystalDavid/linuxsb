@@ -10,7 +10,7 @@ export struct TopicSummaryCard {
   build() {
     Column() {
       Text(this.detail.title)
-        .fontSize(24)
+        .fontSize(Typography.HEADLINE)
         .lineHeight(32)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())

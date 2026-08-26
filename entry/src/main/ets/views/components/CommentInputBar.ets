@@ -1,10 +1,19 @@
 import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import {
-  buildImmersiveGlassEffect
+  buildImmersiveGlassEffect,
+  IMMERSIVE_GLASS_BORDER_WIDTH,
+  IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
+  IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
 import { SYS_BOTTOM_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { WriteResult } from '../../services/repository/WriteRepository';
-import { ImmersiveIconButton } from './ImmersiveIconButton';
+import {
+  GLASS_ACTION_ARROW_ICON_SIZE,
+  GLASS_ACTION_ARROW_ICON_WEIGHT,
+  ImmersiveIconButton
+} from './ImmersiveIconButton';
+
+export const REPLY_CONTROL_HEIGHT: number = 42;
 
 @Component
 export struct CommentInputBar {
@@ -57,7 +66,7 @@ export struct CommentInputBar {
           TextInput({ text: this.draft, placeholder: this.authenticated ? '写回复…' : '登录后回复' })
             .id('topic-reply-input')
             .layoutWeight(1)
-            .height(42)
+            .height(REPLY_CONTROL_HEIGHT - 2)
             .fontSize(Typography.BODY)
             .backgroundColor(Color.Transparent)
             .enabled(this.authenticated && !this.submitting)
@@ -66,12 +75,17 @@ export struct CommentInputBar {
             .onSubmit(() => this.submit())
         }
         .layoutWeight(1)
-        .height(44)
+        .id('topic-reply-input-surface')
+        .height(REPLY_CONTROL_HEIGHT)
         .padding({ left: 0, right: Spacing.SM })
         .backgroundEffect(buildImmersiveGlassEffect())
         .borderRadius(Radius.PILL)
-        .border({ width: 1.1, color: $r('app.color.liquid_glass_highlight') })
-        .shadow({ radius: 8, color: $r('app.color.hds_floating_action_glow'), offsetY: 2 })
+        .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH, color: $r('app.color.bottom_tab_bar_highlight') })
+        .shadow({
+          radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+          color: $r('app.color.bottom_tab_bar_shadow'),
+          offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+        })
         .onClick(() => {
           if (!this.authenticated) {
             this.onLogin();
@@ -79,16 +93,16 @@ export struct CommentInputBar {
         })
 
         ImmersiveIconButton({
-          icon: $r('sys.symbol.arrow_up_circle_fill'),
+          icon: $r('sys.symbol.arrow_up'),
           semanticId: 'topic-reply-send',
           semanticLabel: '发送回复',
-          buttonSize: 44,
-          iconSize: 36,
-          iconWeight: 700,
-          iconColor: this.canSubmit() ? $r('app.color.brand_primary') : SemanticColors.disabled(),
+          buttonSize: REPLY_CONTROL_HEIGHT,
+          iconSize: GLASS_ACTION_ARROW_ICON_SIZE,
+          iconWeight: GLASS_ACTION_ARROW_ICON_WEIGHT,
+          iconColor: $r('app.color.brand_primary'),
           onAction: () => this.submit()
         })
-          .opacity(this.canSubmit() ? 1 : 0.55)
+          .opacity(1)
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)

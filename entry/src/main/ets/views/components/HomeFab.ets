@@ -4,7 +4,8 @@ import { ColorMetrics, LengthMetrics } from '@ohos.arkui.node';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
   buildImmersiveFloatingActionButtonModifier,
-  IMMERSIVE_ACTION_BAR_BLUR_STRATEGY
+  IMMERSIVE_ACTION_BAR_BLUR_STRATEGY,
+  IMMERSIVE_FAB_BUTTON_SIZE
 } from '../../common/ui/ImmersiveActionBarStyle';
 
 class FabDragOffset {
@@ -122,8 +123,8 @@ export struct HomeFab {
       blurStrategy: IMMERSIVE_ACTION_BAR_BLUR_STRATEGY
     })
     .id(this.semanticId)
-    .width(52)
-    .height(52)
+    .width(IMMERSIVE_FAB_BUTTON_SIZE)
+    .height(IMMERSIVE_FAB_BUTTON_SIZE)
     .translate({ x: this.dragOffset.x, y: this.dragOffset.y })
     .priorityGesture(
       PanGesture({ direction: PanDirection.All, distance: 1 })
@@ -136,7 +137,7 @@ export struct HomeFab {
 
   private actionButton(): ActionBarButton {
     return new ActionBarButton({
-      width: LengthMetrics.vp(52),
+      width: LengthMetrics.vp(IMMERSIVE_FAB_BUTTON_SIZE),
       backgroundColor: ColorMetrics.resourceColor(Color.Transparent),
       buttonModifier: buildImmersiveFloatingActionButtonModifier(),
       iconSize: LengthMetrics.vp(23),
@@ -149,7 +150,7 @@ export struct HomeFab {
 
   private actionBarStyle(): ActionBarStyle {
     return new ActionBarStyle({
-      height: LengthMetrics.vp(52),
+      height: LengthMetrics.vp(IMMERSIVE_FAB_BUTTON_SIZE),
       backgroundBlurStyle: BlurStyle.NONE,
       backgroundColor: ColorMetrics.resourceColor(Color.Transparent),
       innerSpace: LengthMetrics.vp(0),

@@ -23,6 +23,7 @@ export struct TopicListItem {
   contentHorizontalPadding: number = 12;
   semanticId: string = '';
   @Prop layoutVariant: TopicListLayoutVariant = TopicListLayoutVariant.LegacyCompact;
+  emphasizeTitle: boolean = false;
 
   private authorName(): string {
     return this.topic.author.displayName.length > 0 ? this.topic.author.displayName : '社区用户';
@@ -66,13 +67,13 @@ export struct TopicListItem {
   }
 
   private topicTitleSize(): number {
-    return this.layoutVariant === TopicListLayoutVariant.ThreeMetadataRows ||
+    return this.emphasizeTitle || this.layoutVariant === TopicListLayoutVariant.ThreeMetadataRows ||
       this.layoutVariant === TopicListLayoutVariant.AuthorHeader ? TITLE_FONT_SIZE_DEFAULT + 1 :
       TITLE_FONT_SIZE_DEFAULT;
   }
 
   private topicTitleWeight(): number {
-    return this.layoutVariant === TopicListLayoutVariant.ThreeMetadataRows ||
+    return this.emphasizeTitle || this.layoutVariant === TopicListLayoutVariant.ThreeMetadataRows ||
       this.layoutVariant === TopicListLayoutVariant.AuthorHeader ? 500 : TITLE_FONT_WEIGHT_DEFAULT;
   }
 

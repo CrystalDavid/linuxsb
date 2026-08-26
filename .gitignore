@@ -10,6 +10,21 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+/.preview
+/coverage/
+/test-results/
+
+# OS/editor noise and transient diagnostics
+.DS_Store
+Thumbs.db
+*.log
+*.trace
+*.har
+*.hprof
+
+# Packaged outputs are produced from ignored build directories
+*.hap
+*.app
 
 # Local device evidence and anonymous protocol snapshots
 /artifacts/
@@ -20,3 +35,9 @@
 *.p7b
 *.pem
 *.key
+*.pfx
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example

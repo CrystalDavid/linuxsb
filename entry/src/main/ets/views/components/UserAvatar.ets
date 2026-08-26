@@ -9,10 +9,20 @@ export struct UserAvatar {
   semanticId: string = 'user-avatar';
   @State private imageFailed: boolean = false;
 
+  private initialFontSize(): number {
+    if (this.avatarSize >= 60) {
+      return Typography.HEADLINE;
+    }
+    if (this.avatarSize >= 44) {
+      return Typography.SECTION_TITLE;
+    }
+    return this.avatarSize >= 34 ? Typography.BODY_SMALL : Typography.METADATA;
+  }
+
   @Builder
   private fallback() {
     Text(this.user.initial)
-      .fontSize(Math.max(13, Math.round(this.avatarSize * 0.38)))
+      .fontSize(this.initialFontSize())
       .fontWeight(FontWeight.Medium)
       .fontColor(AppColors.brandPrimary())
       .width(this.avatarSize)

@@ -16,6 +16,7 @@ export struct PaginatedTopicList {
   onTopicSelected: (topic: TopicUiModel) => void = () => {};
   onRetry: () => void = () => {};
   layoutVariant: TopicListLayoutVariant = TopicListLayoutVariant.LegacyCompact;
+  emphasizeTopicTitle: boolean = false;
 
   private async loadMore(): Promise<void> {
     await this.viewModel.loadMore();
@@ -53,6 +54,7 @@ export struct PaginatedTopicList {
             TopicListItem({
               topic: topic,
               layoutVariant: this.layoutVariant,
+              emphasizeTitle: this.emphasizeTopicTitle,
               semanticId: `${this.semanticPrefix}-topic-${topic.topicId}`,
               onTopicClick: (selected: TopicUiModel) => this.onTopicSelected(selected)
             })

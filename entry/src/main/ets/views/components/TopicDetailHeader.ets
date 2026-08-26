@@ -2,7 +2,6 @@ import { SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import { resolveTopicDetailHeaderMode, TopicDetailHeaderMode } from '../../common/ui/TopicDetailHeaderState';
 import {
   ImmersiveIconButton,
-  TITLE_BAR_BACK_BUTTON_SIZE,
   TITLE_BAR_BACK_ICON_SIZE,
   TITLE_BAR_BACK_ICON_WEIGHT
 } from './ImmersiveIconButton';
@@ -25,7 +24,6 @@ export struct TopicDetailHeader {
         semanticId: 'topic-back',
         semanticLabel: '返回',
         icon: $r('sys.symbol.chevron_left'),
-        buttonSize: TITLE_BAR_BACK_BUTTON_SIZE,
         iconSize: TITLE_BAR_BACK_ICON_SIZE,
         iconWeight: TITLE_BAR_BACK_ICON_WEIGHT,
         onAction: () => this.onBack()
@@ -33,7 +31,7 @@ export struct TopicDetailHeader {
       Stack({ alignContent: Alignment.Start }) {
         Text('帖子详情')
           .id('topic-header-summary-label')
-          .fontSize(20)
+          .fontSize(Typography.PAGE_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor(SemanticColors.textPrimary())
           .maxLines(1)
@@ -45,7 +43,7 @@ export struct TopicDetailHeader {
           .animation({ duration: 250, curve: Curve.EaseInOut })
         Column({ space: 2 }) {
           Text(this.title.length > 0 ? this.title : '主题详情')
-            .fontSize(16)
+            .fontSize(Typography.LIST_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor(SemanticColors.textPrimary())
             .maxLines(1)

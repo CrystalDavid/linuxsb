@@ -1,4 +1,4 @@
-import { AppColors, SemanticColors } from '../../common/theme/DesignSystem';
+import { AppColors, SemanticColors, Typography } from '../../common/theme/DesignSystem';
 
 @Component
 export struct ChoiceChip {
@@ -10,7 +10,7 @@ export struct ChoiceChip {
   build() {
     Row() {
       Text(this.label)
-        .fontSize(14)
+        .fontSize(Typography.BODY_SMALL)
         .fontWeight(this.selected ? FontWeight.Medium : FontWeight.Regular)
         .fontColor(this.selected ? AppColors.brandPrimary() : SemanticColors.textPrimary())
         .maxLines(1)
