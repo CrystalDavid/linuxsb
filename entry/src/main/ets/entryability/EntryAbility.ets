@@ -12,6 +12,7 @@ const DOMAIN = 0x0000;
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     ThemeManager.init(this.context);
+    m1Runtime.initialize(this.context);
     HomeTopicListLayout.init();
     TopicListStylePrefs.seedDefaults();
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');

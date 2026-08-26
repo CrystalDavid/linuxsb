@@ -190,7 +190,7 @@ M3 不改变已冻结的 RCP / 轻量解码 / TaskPool / ArkUI 架构，仅扩�
 | 发帖与回复实现 | PASS | 原生编辑器和简约回复栏已接入 `WriteRepository`；回复输入已删除左侧编辑图标及其预留空白，输入外层与发送按钮统一为 42vp 高，发送端复用单层液态玻璃并使用 24vp/800 的系统 `arrow_up`。箭头始终使用品牌蓝且不降低透明度，已删除 `arrow_up_circle_fill` 形成的第二个蓝色实心圆底；未登录时按钮仍可进入官方登录。发表主题页未登录时不渲染发布、板块、标题和正文控件，仅显示无外框登录门禁；门禁通过顶部锚定布局固定在标题栏正文区域起点 12vp 内，不再因短内容落到页面中下部。登录后显示 40vp 圆润玻璃发布按钮及包含全部真实板块的两列网格。Transport 仅 allowlist `/topic_edit` 和 `/reply_edit`；单元测试仅用 fake transport 校验字段 |
 | 真实社区 POST | NOT RUN | 未自动发帖或回复，没有为验收创造社区垃圾内容；P0-8 历史状态不变 |
 | 登录完成返回 | PASS | 官方登录原生头部读取系统顶部安全区，标题和“完成并返回”整体避开状态栏/挖孔区，旧“临时网页登录……”说明已删除；关闭时先从 UI 移除临时 ArkWeb，下一帧再抓取 Cookie/刷新；手工复验 600ms 后 Profile=1、Web=0，专项设备测试通过 |
-| 性能样本 | PASS | 含图主题 destination 约 9ms、Skeleton 约 26ms、首段文字约 968ms、TaskPool 约 14ms；首图约 5.06s 的外部 CDN 阶段不再阻塞正文。首页 FAB 改为帧边界合并位移、移除逐事件缩放并将识别阈值降至 1vp；Pura 90 RenderService 实际拖动记录中 >16.67ms、>33ms、>66ms 卡顿均为 0 |
+| 性能样本 | PASS（API 24 模拟器 + API 26 真机） | 匿名首页 Preferences 快照先呈现再实时刷新；模拟器同口径冷启动首主题平均由约 2736ms 降至 1131ms。板块/搜索/个人分页列表改为 `LazyForEach + IDataSource` 并保留 6 个离屏缓存节点。Mate 80 Pro Max 真机在 90Hz 首页双向惯性滑动 5 轮时 RenderService >16.67ms、>33ms、>66ms 均为 0；未缓存主题首文本 396ms，缓存命中首文本 28ms。真机无线 HDC 冷进程语义检测 5 次平均约 2005ms，包含工具轮询地板；完整口径见 `docs/performance.md` |
 | 自动测试 | NOT RUN（当前） | 删除测试源码前的历史结果为 `hvigor test` 91/91、`hvigor onDeviceTest` 13/13；按维护者要求，`entry/src/test`、`entry/src/ohosTest` 与 mock 已于 2026-08-26 清理，后续改动不得继续借用旧结果宣称自动回归 PASS |
 | 模拟器 signed HAP | PASS | Pura 90 API 24 构建、覆盖安装、启动成功；最终 Home `dumpLayout` Web 0，进程 Fatal 0、`UI_FALLBACK` 0、Cookie 泄露 0、HTTP POST 0；全局 6vp 单层玻璃已截图复验，控件内文字不再与底层内容抢读 |
 | API 26 真机最终复验 | NOT RUN | HDC 重启后只发现 `127.0.0.1:5555` 模拟器，Windows 未枚举 HDC Interface；待手机重新建立 HDC 连接后再安装复验，不能用模拟器结果代替 |
@@ -247,7 +247,7 @@ ProtocolAdapter
 
 ### 3.3 缓存
 
-- 首页优先显示上一次成功缓存，再后台刷新；
+- 匿名首页第一页由原生 Preferences 保存公开快照，优先显示后后台刷新；最长 12 小时且不缓存登录态、Cookie、搜索或个人 feed；
 - 主题缓存按 ID 保存有限最近记录；
 - Cookie 不写普通 Preferences，不写日志；
 - 用户可以清缓存，但清缓存不得删除草稿或登录会话。

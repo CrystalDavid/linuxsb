@@ -16,6 +16,7 @@ import {
 import { SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { FeedSort, HomeFeedRequest } from '../../models/HomeModels';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
+import { TopicListDataSource } from '../../models/presentation/TopicListDataSource';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { LoadStateView } from '../components/LoadStateView';
@@ -26,7 +27,6 @@ import {
   TITLE_BAR_SEGMENT_LABEL_SIZE,
   TITLE_BAR_SEGMENT_WIDTH
 } from '../components/CompactSegmentedControl';
-import { TopicListDataSource } from '../components/TopicListDataSource';
 import { TopicListItem } from '../components/TopicListItem';
 import { HomeFab } from '../components/HomeFab';
 
@@ -66,6 +66,9 @@ export struct HomePage {
   }
 
   private async load(isRefresh: boolean): Promise<void> {
+    if (!isRefresh && this.viewModel.state === ViewLoadState.Idle && await this.viewModel.restoreCached()) {
+      this.syncPresentation();
+    }
     await this.viewModel.load(isRefresh);
     this.syncPresentation();
   }
@@ -105,7 +108,7 @@ export struct HomePage {
   private prefetchFrom(firstVisible: number): void {
     const ids: number[] = [];
     const topics = this.topicDataSource.getAll();
-    for (let index = Math.max(0, firstVisible); index < topics.length && ids.length < 2; index++) {
+    for (let index = Math.max(0, firstVisible); index < topics.length && ids.length < 3; index++) {
       ids.push(topics[index].topicId);
     }
     const key = ids.join(',');

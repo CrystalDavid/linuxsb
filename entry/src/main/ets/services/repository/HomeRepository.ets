@@ -1,3 +1,4 @@
+import { common } from '@kit.AbilityKit';
 import {
   CurrentUserSummary,
   FeedScope,
@@ -7,6 +8,7 @@ import {
   TopicSummary
 } from '../../models/HomeModels';
 import { AuthSessionPort } from '../auth/AuthSession';
+import { HomeFeedDiskCache } from '../cache/HomeFeedDiskCache';
 import { ProductDecodePort } from '../protocol/ProductProtocolModels';
 import {
   ForumTransport,
@@ -26,11 +28,42 @@ export class HomeRepository implements HomeDataSourcePort {
   private transport: ForumTransport;
   private decoder: ProductDecodePort;
   private authSession: AuthSessionPort | undefined;
+  private persistentCache: HomeFeedDiskCache | undefined = undefined;
 
   constructor(transport: ForumTransport, decoder: ProductDecodePort, authSession?: AuthSessionPort) {
     this.transport = transport;
     this.decoder = decoder;
     this.authSession = authSession;
+  }
+
+  configurePersistentCache(context: common.UIAbilityContext): void {
+    if (this.persistentCache === undefined) {
+      this.persistentCache = new HomeFeedDiskCache(context);
+    }
+  }
+
+  async loadCachedHome(request: HomeFeedRequest = HomeFeedRequest.home()): Promise<HomeLoadResult> {
+    const cacheKey = this.cacheKey(request, this.authSession?.getRequestCookieHeader());
+    if (cacheKey === undefined || this.persistentCache === undefined) {
+      return this.cacheMissResult();
+    }
+    const lookup = await this.persistentCache.read(cacheKey);
+    if (lookup === undefined) {
+      return this.cacheMissResult();
+    }
+    return {
+      ok: true,
+      data: lookup.feed,
+      diagnostics: {
+        statusCode: 200,
+        networkMs: 0,
+        parseMs: 0,
+        inputBytes: 0,
+        execution: 'PERSISTED_CACHE',
+        cacheHit: true,
+        cacheAgeMs: lookup.ageMs
+      }
+    };
   }
 
   async loadHome(request: HomeFeedRequest = HomeFeedRequest.home()): Promise<HomeLoadResult> {
@@ -151,7 +184,33 @@ export class HomeRepository implements HomeDataSourcePort {
       nextPageUrl: decoded.document.nextPageUrl ?? '',
       currentUser: currentUser
     };
+    const cacheKey = this.cacheKey(request, cookieHeader);
+    if (cacheKey !== undefined) {
+      this.persistentCache?.scheduleWrite(cacheKey, feed);
+    }
     return { ok: true, data: feed, diagnostics: diagnostics };
+  }
+
+  private cacheKey(request: HomeFeedRequest, cookieHeader: string | undefined): string | undefined {
+    if (cookieHeader !== undefined || request.scope !== FeedScope.Home || request.pageUrl.length > 0) {
+      return undefined;
+    }
+    return `anonymous_home_${request.sort}`;
+  }
+
+  private cacheMissResult(): HomeLoadResult {
+    return {
+      ok: false,
+      failure: { kind: RepositoryFailureKind.Network, message: 'HOME_CACHE_MISS' },
+      diagnostics: {
+        statusCode: 0,
+        networkMs: 0,
+        parseMs: 0,
+        inputBytes: 0,
+        execution: 'PERSISTED_CACHE_MISS',
+        cacheHit: false
+      }
+    };
   }
 
   private requiresAuthentication(request: HomeFeedRequest): boolean {

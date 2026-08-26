@@ -161,7 +161,8 @@ export class RcpForumTransport implements ForumTransport {
         contentEncoding: contentEncoding,
         elapsedMs: Date.now() - startedAt,
         effectiveUrl: response.effectiveUrl?.toString() ?? url,
-        sha256: ResponseFingerprint.sha256Hex(response.body),
+        sha256: cachePolicy === TransportCachePolicy.ProbeNoStore ?
+          ResponseFingerprint.sha256Hex(response.body) : '',
         etag: etag,
         lastModified: lastModified
       };

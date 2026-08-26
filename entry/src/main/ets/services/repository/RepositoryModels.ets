@@ -41,6 +41,7 @@ export interface TopicLoadResult {
 
 export interface HomeDataSourcePort {
   loadHome(request?: HomeFeedRequest): Promise<HomeLoadResult>;
+  loadCachedHome?(request?: HomeFeedRequest): Promise<HomeLoadResult>;
 }
 
 export interface TopicDataSourcePort {

@@ -6,6 +6,7 @@ import {
   TopicSummary
 } from '../models/HomeModels';
 import { TopicUiModel } from '../models/presentation/ForumUiModels';
+import { TopicListDataSource } from '../models/presentation/TopicListDataSource';
 import { TopicPresentationMapper } from '../services/presentation/TopicPresentationMapper';
 import { HomeDataSourcePort, RepositoryDiagnostics, RepositoryFailureKind, emptyDiagnostics } from '../services/repository/RepositoryModels';
 import { ViewLoadState } from './ViewState';
@@ -15,6 +16,7 @@ export class HomeViewModel {
   state: ViewLoadState = ViewLoadState.Idle;
   topics: TopicSummary[] = [];
   presentationTopics: TopicUiModel[] = [];
+  readonly presentationDataSource: TopicListDataSource = new TopicListDataSource();
   forums: ForumSummary[] = [];
   currentUser: CurrentUserSummary | undefined = undefined;
   protocolVersion: string = '';
@@ -47,7 +49,7 @@ export class HomeViewModel {
 
   async load(isRefresh: boolean = false): Promise<void> {
     this.refreshing = isRefresh;
-    if (!isRefresh || this.topics.length === 0) {
+    if (this.topics.length === 0) {
       this.state = ViewLoadState.Loading;
     }
     this.errorMessage = '';
@@ -57,7 +59,7 @@ export class HomeViewModel {
     if (!result.ok || result.data === undefined) {
       const failureKind = result.failure?.kind ?? RepositoryFailureKind.Network;
       this.errorMessage = result.failure?.message ?? 'UNKNOWN_HOME_ERROR';
-      if (isRefresh && this.topics.length > 0) {
+      if (this.topics.length > 0) {
         this.state = ViewLoadState.Content;
       } else {
         this.state = failureKind === RepositoryFailureKind.Offline ? ViewLoadState.Offline : ViewLoadState.Error;
@@ -66,6 +68,20 @@ export class HomeViewModel {
     }
     this.applyFeed(result.data, false);
     this.state = this.topics.length === 0 ? ViewLoadState.Empty : ViewLoadState.Content;
+  }
+
+  async restoreCached(): Promise<boolean> {
+    if (this.topics.length > 0 || this.dataSource.loadCachedHome === undefined) {
+      return false;
+    }
+    const result = await this.dataSource.loadCachedHome(this.request);
+    if (!result.ok || result.data === undefined) {
+      return false;
+    }
+    this.diagnostics = result.diagnostics;
+    this.applyFeed(result.data, false);
+    this.state = this.topics.length === 0 ? ViewLoadState.Empty : ViewLoadState.Content;
+    return this.topics.length > 0;
   }
 
   async loadMore(): Promise<void> {
@@ -111,13 +127,17 @@ export class HomeViewModel {
       }
       this.topics = merged;
       if (this.presentationTopics.length + fresh.length === merged.length) {
-        this.presentationTopics = this.presentationTopics.concat(this.mapper.mapSummaries(fresh));
+        const mappedFresh = this.mapper.mapSummaries(fresh);
+        this.presentationTopics = this.presentationTopics.concat(mappedFresh);
+        this.presentationDataSource.appendUnique(mappedFresh);
       } else {
         this.presentationTopics = this.mapper.mapSummaries(merged);
+        this.presentationDataSource.reset(this.presentationTopics);
       }
     } else {
       this.topics = feed.topics;
       this.presentationTopics = this.mapper.mapSummaries(this.topics);
+      this.presentationDataSource.reset(this.presentationTopics);
     }
     this.protocolVersion = feed.protocolVersion;
     this.currentPage = feed.currentPage ?? 1;
@@ -165,6 +185,7 @@ export class HomeViewModel {
     this.state = ViewLoadState.Idle;
     this.topics = [];
     this.presentationTopics = [];
+    this.presentationDataSource.reset([]);
     this.protocolVersion = '';
     this.errorMessage = '';
     this.loadMoreError = '';

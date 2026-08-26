@@ -1,3 +1,4 @@
+import { common } from '@kit.AbilityKit';
 import { AuthSession } from '../services/auth/AuthSession';
 import { TopicPrefetchCoordinator } from '../services/cache/TopicPrefetchCoordinator';
 import { TopicPresentationMapper } from '../services/presentation/TopicPresentationMapper';
@@ -23,6 +24,10 @@ export class M1Runtime {
   readonly searchViewModel: HomeViewModel = new HomeViewModel(this.homeRepository, this.mapper);
   readonly profileViewModel: HomeViewModel = new HomeViewModel(this.homeRepository, this.mapper);
   readonly topicViewModel: TopicDetailViewModel = new TopicDetailViewModel(this.topicRepository, this.mapper);
+
+  initialize(context: common.UIAbilityContext): void {
+    this.homeRepository.configurePersistentCache(context);
+  }
 
   prefetchTopics(topicIds: number[]): void {
     this.prefetchCoordinator.schedule(topicIds);

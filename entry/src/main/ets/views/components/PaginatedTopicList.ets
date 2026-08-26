@@ -50,7 +50,7 @@ export struct PaginatedTopicList {
           if (this.topSpacer > 0) {
             ListItem() { Column().width('100%').height(this.topSpacer) }
           }
-          ForEach(this.viewModel.presentationTopics, (topic: TopicUiModel) => {
+          LazyForEach(this.viewModel.presentationDataSource, (topic: TopicUiModel) => {
             TopicListItem({
               topic: topic,
               layoutVariant: this.layoutVariant,
@@ -64,6 +64,7 @@ export struct PaginatedTopicList {
         .id(`${this.semanticPrefix}-topic-list`)
         .width('100%').height('100%')
         .scrollBar(BarState.Off)
+        .cachedCount(6)
       } else {
         LoadStateView({
           state: this.viewModel.state,

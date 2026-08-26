@@ -1,5 +1,10 @@
-import { TopicUiModel } from '../../models/presentation/ForumUiModels';
+import { TopicUiModel } from './ForumUiModels';
 
+/**
+ * ArkUI-native observable topic source shared by every lazy topic list.
+ * It keeps list-node creation proportional to the viewport instead of the
+ * total number of pages already loaded.
+ */
 export class TopicListDataSource implements IDataSource {
   private items: TopicUiModel[] = [];
   private listeners: DataChangeListener[] = [];

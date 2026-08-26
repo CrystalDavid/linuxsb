@@ -93,7 +93,10 @@ powershell -ExecutionPolicy Bypass -File scripts/CheckBottomTabVisualLock.ps1
 - [`docs/ui.md`](docs/ui.md)：字号、色彩、深浅色玻璃、组件尺寸与交互规范。
 - [`docs/development.md`](docs/development.md)：工程环境、仓库结构、构建与 Git 规范。
 - [`docs/testing.md`](docs/testing.md)：单元、设备、视觉和安全验收门槛。
+- [`docs/performance.md`](docs/performance.md)：原生缓存、懒列表、华为性能工具与当前实测数据。
 - [`docs/security.md`](docs/security.md)：登录、Cookie、写入、日志与签名边界。
+- [`docs/privacy-policy.md`](docs/privacy-policy.md)：面向测试用户和发布审核的隐私政策正文。
+- [`docs/release-testing.md`](docs/release-testing.md)：真机安装、release 签名、邀请测试与 AppGallery Connect 阶段门。
 - [`docs/project-status.md`](docs/project-status.md)：完整产品基线和当前阶段状态。
 - [`docs/p0-report.md`](docs/p0-report.md)：冻结的 P0 / P0-B 历史证据。
 

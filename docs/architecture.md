@@ -66,6 +66,15 @@ WebCookieManager 读取 bbs_auth / bbs_csrf
 - 缺失字段应产生可诊断的警告或降级状态，不得编造回复、作者或统计数。
 - 列表按服务端分页链接连续加载，按稳定 ID 去重；不得恢复客户端 30 条硬上限。
 
+## 性能数据链路
+
+- 匿名首页第一页允许写入原生 Preferences 快照；命中后先呈现再实时刷新。登录态、Cookie、搜索和个人 feed 不进入该快照。
+- 首页、板块、搜索和个人主题列表使用 ArkUI `LazyForEach + IDataSource`；追加分页必须以 `onDataAdd` 精准通知，不得恢复全量 `ForEach`。
+- 离屏缓存数量由共享列表统一维护；带点击回调、嵌套状态组件或生命周期的主题行不得为追求警告清零强行加 `@Reusable` 或改成 Builder。
+- 主题预取只在滚动停止后执行，最多 3 个候选和 2 个 worker；滚动开始、页面离开或会话变化必须取消。
+- 产品 GET 不在 UI 热路径同步计算完整 SHA-256；只有诊断探针和写请求审计允许生成响应指纹。
+- 性能指标、工具和当前实测统一维护在 [performance.md](performance.md)。
+
 ## 原生性检查
 
 普通业务页的运行时布局树必须为 Web 节点 0。`scripts/NoWebOutsideLogin.ps1` 是静态边界检查；设备验收还需对首页、板块、搜索、个人页和主题详情执行 `dumpLayout`。

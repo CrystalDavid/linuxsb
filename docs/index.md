@@ -10,7 +10,10 @@
 | [ui.md](ui.md) | 字号、色彩、玻璃、间距、圆角、组件尺寸与深浅色规范 | 任一全局视觉参数或共享组件发生变化时 |
 | [development.md](development.md) | 环境、构建、目录约束、提交与协作流程 | 工具链、SDK、脚本或仓库结构发生变化时 |
 | [testing.md](testing.md) | 构建、静态保护、设备视觉与安全验收口径 | 验证方式、阶段门或证据状态发生变化时 |
+| [performance.md](performance.md) | 原生性能架构、华为工具、基准口径与实测数据 | 缓存、列表、启动、网络热路径或性能数据变化时 |
 | [security.md](security.md) | 登录、Cookie、写请求、日志、签名与隐私边界 | 会话、权限、网络或敏感数据处理发生变化时 |
+| [privacy-policy.md](privacy-policy.md) | 面向用户的隐私政策正文 | 权限、缓存、登录、第三方服务或数据处理发生变化时 |
+| [release-testing.md](release-testing.md) | AppGallery Connect 邀请测试、签名、发布资料与阶段门 | 包名、版本、签名、测试群组或审核状态变化时 |
 | [project-status.md](project-status.md) | 产品基线、当前能力、阶段状态和历史决策 | 里程碑状态或产品范围发生变化时 |
 | [p0-report.md](p0-report.md) | P0 / P0-B 的冻结验证证据 | 历史冻结，除纠正事实错误外不改写 |
 

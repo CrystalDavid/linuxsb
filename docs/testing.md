@@ -22,6 +22,12 @@ git diff --check
 - `CheckBottomTabVisualLock` 防止已冻结底栏视觉被无关修改；
 - `git diff --check` 阻止空白错误和冲突标记进入仓库。
 
+## 性能验收
+
+涉及启动、首页、主题详情、列表或缓存的变化，还必须按 [performance.md](performance.md) 的同口径步骤执行：5 次冷启动、未缓存/已缓存主题、首页和受影响列表各 5 轮双向惯性滑动、RenderService 三档卡顿帧，以及 HiSmartPerf CPU/PSS 采样。
+
+模拟器上 SmartPerf `fps=0` 是无效值；不得写成 0 FPS，也不得用它代替 RenderService `hitchs`。API 24 模拟器通过只能证明当前 60Hz 回归没有复现问题，90/120Hz 与真实温控表现仍需 API 26 真机验证。
+
 ## 设备验收
 
 涉及 UI、导航、登录、网络或状态持久化的变化还必须：
