@@ -47,6 +47,7 @@ export struct RootTabPage {
   @State private showOfficialLogin: boolean = false;
   @State private loginReturnsToTopic: boolean = false;
   @State private authenticated: boolean = false;
+  @State private loginGeneration: number = 0;
   @State private loginReturnTopicId: number = 0;
   @State private ignoreTopicTapUntil: number = 0;
   @State private selectedTab: CommunityTab = CommunityTab.Home;
@@ -56,7 +57,13 @@ export struct RootTabPage {
 
   aboutToAppear(): void {
     TopicOpenTrace.configure(this.debugPackage);
-    this.authenticated = m1Runtime.hasMemorySession();
+    m1Runtime.onSessionStateChanged = (authenticated: boolean) => {
+      this.authenticated = authenticated;
+    };
+    this.authenticated = m1Runtime.restorePersistedSession();
+    if (this.authenticated) {
+      m1Runtime.verifyActiveSession(true);
+    }
   }
 
   private openTopic(topic: TopicUiModel): void {
@@ -109,6 +116,9 @@ export struct RootTabPage {
     }
     this.selectedTab = tab;
     this.tabsController.changeIndex(tab as number);
+    if (tab === CommunityTab.Profile && m1Runtime.hasMemorySession()) {
+      m1Runtime.verifyActiveSession();
+    }
   }
 
   private openCreatedTopic(topicId: number): void {
@@ -168,6 +178,7 @@ export struct RootTabPage {
     }
     this.authenticated = m1Runtime.hasMemorySession();
     if (this.authenticated) {
+      this.loginGeneration++;
       m1Runtime.homeViewModel.load(true);
     }
   }
@@ -286,6 +297,7 @@ export struct RootTabPage {
             sessionViewModel: m1Runtime.homeViewModel,
             profileViewModel: m1Runtime.profileViewModel,
             authenticated: this.authenticated,
+            loginGeneration: this.loginGeneration,
             onLogin: () => this.requestHomeLogin(),
             onOpenSettings: () => this.openSettings(),
             onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)

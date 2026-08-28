@@ -99,8 +99,8 @@ export struct ComposeTopicPage {
   }
 
   private forumGridHeight(): number {
-    const rowCount = Math.ceil(this.catalogViewModel.forums.length / 2);
-    return rowCount > 0 ? rowCount * 42 + (rowCount - 1) * Spacing.SM : 0;
+    const rowCount = Math.ceil(this.catalogViewModel.forums.length / 3);
+    return rowCount > 0 ? rowCount * 40 + (rowCount - 1) * Spacing.SM : 0;
   }
 
   @Builder
@@ -149,26 +149,36 @@ export struct ComposeTopicPage {
         Grid() {
           ForEach(this.catalogViewModel.forums, (forum: ForumSummary) => {
             GridItem() {
-              Button(forum.name, { type: ButtonType.Capsule, stateEffect: false })
-                .id(`compose-forum-${forum.forumId}`)
-                .width('100%')
-                .height(42)
-                .padding({ left: Spacing.SM, right: Spacing.SM })
-                .fontSize(Typography.LABEL)
-                .fontWeight(this.forumId === forum.forumId ? FontWeight.Medium : FontWeight.Regular)
-                .fontColor(this.forumId === forum.forumId ? $r('app.color.brand_primary') :
-                  SemanticColors.textSecondary())
-                .backgroundColor(this.forumId === forum.forumId ? $r('app.color.liquid_segment_selected') :
-                  Color.Transparent)
-                .border({ width: 1, color: $r('app.color.liquid_glass_highlight') })
-                .borderRadius(Radius.PILL)
-                .hoverEffect(HoverEffect.None)
-                .onClick(() => { this.forumId = forum.forumId; })
+              Button({ type: ButtonType.Capsule, stateEffect: false }) {
+                Text(forum.name)
+                  .id(`compose-forum-${forum.forumId}-label`)
+                  .fontSize(Typography.LABEL)
+                  .fontWeight(this.forumId === forum.forumId ? FontWeight.Medium : FontWeight.Regular)
+                  .fontColor(this.forumId === forum.forumId ? $r('app.color.brand_primary') :
+                    SemanticColors.textSecondary())
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .id(`compose-forum-${forum.forumId}`)
+              .accessibilityText(forum.name)
+              .width('100%')
+              .height(40)
+              .padding({ left: Spacing.XS, right: Spacing.XS })
+              .backgroundColor(this.forumId === forum.forumId ?
+                $r('app.color.compose_forum_selected_bg') : $r('app.color.liquid_glass_bg'))
+              .border({
+                width: IMMERSIVE_GLASS_BORDER_WIDTH,
+                color: this.forumId === forum.forumId ?
+                  $r('app.color.brand_primary') : $r('app.color.liquid_glass_highlight')
+              })
+              .borderRadius(Radius.PILL)
+              .hoverEffect(HoverEffect.None)
+              .onClick(() => { this.forumId = forum.forumId; })
             }
           }, (forum: ForumSummary) => forum.forumId.toString())
         }
         .id('compose-forum-grid')
-        .columnsTemplate('1fr 1fr')
+        .columnsTemplate('1fr 1fr 1fr')
         .columnsGap(Spacing.SM)
         .rowsGap(Spacing.SM)
         .width('100%')
@@ -222,11 +232,13 @@ export struct ComposeTopicPage {
         } else {
           Scroll() {
             Column({ space: Spacing.LG }) {
-              this.forumSelector()
               TextInput({ text: this.title, placeholder: '标题' })
                 .id('compose-title')
                 .width('100%').height(48)
                 .fontSize(Typography.BODY_LARGE)
+                .fontColor(SemanticColors.textPrimary())
+                .placeholderColor(SemanticColors.textSecondary())
+                .caretColor($r('app.color.brand_primary'))
                 .backgroundEffect(buildImmersiveGlassEffect())
                 .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
                   color: $r('app.color.bottom_tab_bar_highlight') })
@@ -243,6 +255,9 @@ export struct ComposeTopicPage {
                 .constraintSize({ minHeight: 260 })
                 .fontSize(Typography.BODY)
                 .lineHeight(Typography.READING_LINE_HEIGHT)
+                .fontColor(SemanticColors.textPrimary())
+                .placeholderColor(SemanticColors.textSecondary())
+                .caretColor($r('app.color.brand_primary'))
                 .backgroundEffect(buildImmersiveGlassEffect())
                 .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
                   color: $r('app.color.bottom_tab_bar_highlight') })
@@ -253,6 +268,7 @@ export struct ComposeTopicPage {
                   offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
                 })
                 .onChange((value: string) => { this.body = value; })
+              this.forumSelector()
               if (this.resultMessage.length > 0) {
                 Text(this.resultMessage)
                   .fontSize(Typography.LABEL)

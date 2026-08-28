@@ -331,8 +331,10 @@ export struct ImmersiveBottomTabBar {
     .clip(false)
     .backgroundColor(Color.Transparent)
     // One sampling layer, one moving capsule, and a bright edge with a single
-    // neutral shadow: the API 24-compatible form of the Harmony luminous material.
-    .backgroundEffect(buildImmersiveGlassEffect(6, 1.08, $r('app.color.bottom_tab_bar_bg'), 1.12))
+    // neutral shadow. The bar is the hero glass surface: a deeper 24vp frost with
+    // a brightness lift melts scrolling content into the soft luminous field the
+    // reference floating bars show, while small controls keep the shared 6vp glass.
+    .backgroundEffect(buildImmersiveGlassEffect(24, 1.15, $r('app.color.bottom_tab_bar_frost'), 1.35))
     .borderWidth(1.25)
     .borderColor($r('app.color.bottom_tab_bar_highlight'))
     .borderRadius(Radius.PILL)

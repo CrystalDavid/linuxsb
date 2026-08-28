@@ -21,10 +21,12 @@ export class SessionProbe {
     this.cookieBroker = cookieBroker;
   }
 
-  async verify(): Promise<AuthenticatedSessionProbeResult> {
-    const cookieSummary = this.cookieBroker.inspectArkWebCookies();
+  async verify(refreshFromStore: boolean = true): Promise<AuthenticatedSessionProbeResult> {
+    if (refreshFromStore) {
+      this.cookieBroker.inspectArkWebCookies();
+    }
     const cookieHeader = this.cookieBroker.getRequestCookieHeader();
-    if (!cookieSummary.bbsAuthPresent || !cookieSummary.bbsCsrfPresent || cookieHeader === undefined) {
+    if (cookieHeader === undefined) {
       return {
         attempted: false,
         serverRecognized: false,

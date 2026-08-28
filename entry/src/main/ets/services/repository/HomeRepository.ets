@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import {
   CurrentUserSummary,
   FeedScope,
+  FeedSort,
   ForumSummary,
   HomeFeed,
   HomeFeedRequest,
@@ -189,6 +190,24 @@ export class HomeRepository implements HomeDataSourcePort {
       this.persistentCache?.scheduleWrite(cacheKey, feed);
     }
     return { ok: true, data: feed, diagnostics: diagnostics };
+  }
+
+  async findTopicByTitle(forumId: number, title: string): Promise<number> {
+    const normalized = title.trim();
+    if (forumId <= 0 || normalized.length === 0) {
+      return 0;
+    }
+    const result = await this.loadHome(HomeFeedRequest.forum(forumId, FeedSort.NewTopics));
+    if (!result.ok || result.data === undefined) {
+      return 0;
+    }
+    const topics = result.data.topics;
+    for (let index = 0; index < topics.length; index++) {
+      if (topics[index].title.trim() === normalized) {
+        return topics[index].topicId;
+      }
+    }
+    return 0;
   }
 
   private cacheKey(request: HomeFeedRequest, cookieHeader: string | undefined): string | undefined {

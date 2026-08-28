@@ -49,6 +49,7 @@ export default class EntryAbility extends UIAbility {
 
   onForeground(): void {
     ThemeManager.applyConfiguration(this.context.config);
+    m1Runtime.verifyActiveSession();
     // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
   }

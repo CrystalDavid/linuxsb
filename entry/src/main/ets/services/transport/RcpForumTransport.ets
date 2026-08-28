@@ -239,7 +239,25 @@ export class RcpForumTransport implements ForumTransport {
     request.destination = 'array-buffer';
     this.activeRequests.push(request);
     try {
-      const response = await session.fetch(request);
+      let response = await session.fetch(request);
+      // BBS1 accepts a write and answers 302 to the resulting topic page. RCP
+      // does not reliably follow redirects on form POSTs, so follow them here
+      // with GET hops and report the final page as the effective response.
+      let currentUrl = url;
+      let lastLocation = '';
+      for (let hop = 0; hop < 3 && this.isRedirectStatus(response.statusCode); hop++) {
+        const location = this.headerValue(response.headers['location']);
+        if (location.length === 0) {
+          break;
+        }
+        lastLocation = location;
+        const nextUrl = this.resolveSameOriginUrl(location);
+        if (nextUrl.length === 0) {
+          break;
+        }
+        currentUrl = nextUrl;
+        response = await this.fetchWriteRedirect(currentUrl, url, cookieHeader, session);
+      }
       const body = response.toString();
       const metadata: TransportProbeMetadata = {
         statusCode: response.statusCode,
@@ -247,9 +265,13 @@ export class RcpForumTransport implements ForumTransport {
         contentType: this.headerValue(response.headers['content-type']),
         contentEncoding: this.headerValue(response.headers['content-encoding']),
         elapsedMs: Date.now() - startedAt,
-        effectiveUrl: response.effectiveUrl?.toString() ?? url,
+        effectiveUrl: response.effectiveUrl?.toString() ?? currentUrl,
         sha256: ResponseFingerprint.sha256Hex(response.body)
       };
+      if (lastLocation.length > 0) {
+        const resolvedLocation = this.resolveSameOriginUrl(lastLocation);
+        metadata.location = resolvedLocation.length > 0 ? resolvedLocation : lastLocation;
+      }
       if (body === null) {
         return { metadata: metadata, body: '', error: { kind: 'BODY_DECODE', code: 0,
           message: 'Response body is not valid UTF-8.' } };
@@ -265,6 +287,44 @@ export class RcpForumTransport implements ForumTransport {
         this.activeRequests.splice(requestIndex, 1);
       }
     }
+  }
+
+  private async fetchWriteRedirect(targetUrl: string, writeUrl: string, cookieHeader: string,
+    session: rcp.Session): Promise<rcp.Response> {
+    const headers: rcp.RequestHeaders = {
+      'accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.5',
+      'user-agent': PRODUCT_USER_AGENT,
+      'referer': writeUrl
+    };
+    if (cookieHeader.length > 0) {
+      headers['cookie'] = cookieHeader;
+    }
+    const request = new rcp.Request(targetUrl, 'GET', headers);
+    request.destination = 'array-buffer';
+    this.activeRequests.push(request);
+    try {
+      return await session.fetch(request);
+    } finally {
+      const requestIndex = this.activeRequests.indexOf(request);
+      if (requestIndex >= 0) {
+        this.activeRequests.splice(requestIndex, 1);
+      }
+    }
+  }
+
+  private isRedirectStatus(statusCode: number): boolean {
+    return statusCode >= 300 && statusCode < 400 && statusCode !== 304;
+  }
+
+  private resolveSameOriginUrl(location: string): string {
+    if (location.startsWith('https://') || location.startsWith('http://')) {
+      return location.startsWith(`${FORUM_ORIGIN}/`) ? location : '';
+    }
+    if (location.startsWith('/')) {
+      return `${FORUM_ORIGIN}${location}`;
+    }
+    return '';
   }
 
   private validatedTopicPageUrl(topicId: number, pageUrl: string): string {

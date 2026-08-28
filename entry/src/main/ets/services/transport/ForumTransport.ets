@@ -27,6 +27,7 @@ export interface TransportProbeMetadata {
   sha256: string;
   etag?: string;
   lastModified?: string;
+  location?: string;
 }
 
 export interface TransportProbeResponse {

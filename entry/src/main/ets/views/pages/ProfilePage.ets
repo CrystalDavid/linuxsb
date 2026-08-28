@@ -26,6 +26,7 @@ export struct ProfilePage {
   @ObjectLink sessionViewModel: HomeViewModel;
   @ObjectLink profileViewModel: HomeViewModel;
   @Prop @Watch('onAuthenticatedChanged') authenticated: boolean = false;
+  @Prop @Watch('onLoginGenerationChanged') loginGeneration: number = 0;
   bottomContentInset: number = PageMetrics.BOTTOM_TAB_BAR_CONTENT_INSET;
   onLogin: () => void = () => {};
   onOpenSettings: () => void = () => {};
@@ -47,6 +48,14 @@ export struct ProfilePage {
     } else {
       this.user = undefined;
       this.profileError = '';
+    }
+  }
+
+  // Fires on every completed official login, including re-logins that keep the
+  // authenticated flag unchanged, so the profile never shows a previous account.
+  private onLoginGenerationChanged(): void {
+    if (this.authenticated) {
+      this.resolveProfile(true);
     }
   }
 

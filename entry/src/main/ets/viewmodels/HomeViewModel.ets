@@ -31,6 +31,7 @@ export class HomeViewModel {
   private dataSource: HomeDataSourcePort;
   private mapper: TopicPresentationMapper;
   private request: HomeFeedRequest;
+  private pendingLoad: Promise<void> | undefined = undefined;
 
   constructor(dataSource: HomeDataSourcePort, mapper: TopicPresentationMapper = new TopicPresentationMapper(),
     request: HomeFeedRequest = HomeFeedRequest.home()) {
@@ -48,6 +49,21 @@ export class HomeViewModel {
   }
 
   async load(isRefresh: boolean = false): Promise<void> {
+    if (this.pendingLoad !== undefined) {
+      // Login completion and profile resolution can both request a refresh in
+      // the same frame; join the in-flight request instead of racing it.
+      return this.pendingLoad;
+    }
+    const started = this.performLoad(isRefresh);
+    this.pendingLoad = started;
+    try {
+      await started;
+    } finally {
+      this.pendingLoad = undefined;
+    }
+  }
+
+  private async performLoad(isRefresh: boolean): Promise<void> {
     this.refreshing = isRefresh;
     if (this.topics.length === 0) {
       this.state = ViewLoadState.Loading;

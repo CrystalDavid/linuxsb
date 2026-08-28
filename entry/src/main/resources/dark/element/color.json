@@ -133,6 +133,10 @@
       "value": "#18000000"
     },
     {
+      "name": "bottom_tab_bar_frost",
+      "value": "#18000000"
+    },
+    {
       "name": "bottom_tab_bar_highlight",
       "value": "#1AFFFFFF"
     },
@@ -159,6 +163,10 @@
     {
       "name": "liquid_segment_selected",
       "value": "#0A5B8FF9"
+    },
+    {
+      "name": "compose_forum_selected_bg",
+      "value": "#2E5B8FF9"
     },
     {
       "name": "bottom_tab_selected_bg",
