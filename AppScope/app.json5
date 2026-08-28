@@ -1,7 +1,7 @@
 {
   "app": {
-    "bundleName": "com.example.shaobingcommunity",
-    "vendor": "example",
+    "bundleName": "com.david.shaobingcommunity",
+    "vendor": "david",
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "buildVersion": "1",

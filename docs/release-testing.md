@@ -5,13 +5,13 @@
 | 项目 | 当前值 | 状态 |
 | --- | --- | --- |
 | 应用名称 | 烧饼社区 | 已确认 |
-| bundleName | `com.example.shaobingcommunity` | 必须在 AGC 登录后核对是否已有同包名应用；未核对前禁止擅自改名 |
+| bundleName | `com.david.shaobingcommunity` | 本地 Release 包已切换；待在 AGC 重新创建并绑定 APP ID |
 | versionName | `1.0.0` | 已确认 |
 | versionCode | `1000000` | 已确认；后续测试版本不得低于已发布测试版本 |
 | target / compatible API | 24 / 23 | 满足当前真机 API 26 运行 |
 | 本地真机包 | debug Profile 签名 HAP | 仅用于已登记真机调试，不能作为邀请测试 release 包 |
-| App Pack | 已完成 `.app` 结构构建 | 当前仍使用 debug Profile；切换 release/云托管签名后必须重新构建 |
-| 隐私政策 | [privacy-policy.md](privacy-policy.md) | 文本已准备；提交前必须发布为用户可访问的 HTTPS 页面 |
+| App Pack | 已完成 Release `.app` 结构构建 | 已核验 `releaseType: Release`；当前为 unsigned，待 DevEco 托管签名 |
+| 隐私政策 | [公开页面](https://crystaldavid.github.io/linuxsb-privacy/) | GitHub Pages 已发布，匿名 HTTPS 访问返回 200 |
 
 公共仓库中的 `build-profile.json5` 必须保持 `signingConfigs: []`。证书、Profile、keystore 路径和密码只能保留在开发者本机或华为云托管签名中，不得进入 Git。
 
@@ -38,7 +38,7 @@
 
 ### 应用介绍
 
-烧饼社区是 LinuxSB 的非官方 HarmonyOS 原生客户端，提供原生板块与帖子列表、主题详情、搜索、深浅色显示和官方账号登录入口。普通业务页面使用 ArkUI 原生组件，网络请求直接访问 LinuxSB；官方登录页仅在用户主动打开时临时加载。
+烧饼社区是 LinuxSB 社区的非官方 HarmonyOS 客户端。
 
 ### 测试说明
 
@@ -54,11 +54,12 @@
 - [x] `.app` App Pack 能成功组装；
 - [x] 真机首页 Web 节点为 0；
 - [x] 真机滑动与主题冷/热加载已有有效证据；
-- [ ] AGC 账号登录并确认应用记录；
-- [ ] 确认 production bundleName，不再使用未经确认的占位身份；
+- [ ] 为 `com.david.shaobingcommunity` 重新创建并绑定 AGC APP ID；
+- [x] production bundleName 已在本地确认为 `com.david.shaobingcommunity`；
+- [x] Release SDK 重新构建完成，包内 `releaseType` 已核验为 `Release`；
 - [ ] 使用 release 或华为云托管证书重新签名；
 - [ ] 软件包合法性检测通过；
-- [ ] 隐私政策通过 HTTPS 对公众可访问；
+- [x] 隐私政策已通过 HTTPS 对公众可访问；
 - [ ] 填写负责人联系方式、测试时间和测试人数；
 - [ ] 账号持有人确认后提交邀请测试审核；
 - [ ] 审核通过并生成分享链接 / 邀请码。

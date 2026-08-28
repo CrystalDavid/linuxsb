@@ -63,7 +63,7 @@ SmartPerf 在该模拟器上把 `fps` 固定返回 0，属于无效采样，不�
 ### HiSmartPerf Device / SP_daemon
 
 ```powershell
-hdc shell /bin/SP_daemon -N 12 -PKG com.example.shaobingcommunity -c -r -f
+hdc shell /bin/SP_daemon -N 12 -PKG com.david.shaobingcommunity -c -r -f
 ```
 
 记录 CPU、PSS、ArkTS heap 和刷新率。模拟器 `fps=0` 时必须标记无效，不得据此计算平均帧率。工具说明见 [HiSmartPerf Device 指南](https://developer.huawei.com/consumer/cn/doc/doccenter-testing/smartperf-guidelines)。

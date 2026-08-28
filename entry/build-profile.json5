@@ -22,6 +22,17 @@
       }
     },
   ],
+  "buildModeBinder": [
+    {
+      "buildModeName": "release",
+      "mappings": [
+        {
+          "buildOptionName": "release",
+          "targetName": "default"
+        }
+      ]
+    }
+  ],
   "targets": [
     {
       "name": "default"
