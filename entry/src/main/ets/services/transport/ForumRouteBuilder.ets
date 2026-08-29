@@ -1,4 +1,4 @@
-import { FeedScope, HomeFeedRequest } from '../../models/HomeModels';
+import { FeedScope, FeedSort, HomeFeedRequest } from '../../models/HomeModels';
 
 const FORUM_ORIGIN: string = 'https://linux.sb';
 
@@ -16,6 +16,12 @@ export class ForumRouteBuilder {
     }
     if (request.scope === FeedScope.Search && request.query.length > 0) {
       return `${FORUM_ORIGIN}/?q=${encodeURIComponent(request.query)}&field=${request.searchField}&sort=${request.sort}`;
+    }
+    if (request.scope === FeedScope.Home && request.sort === FeedSort.Featured) {
+      return `${FORUM_ORIGIN}/topic_featured`;
+    }
+    if (request.scope === FeedScope.Home && request.sort === FeedSort.Footprint) {
+      return `${FORUM_ORIGIN}/unread_topic_notice_footprint`;
     }
     return `${FORUM_ORIGIN}/?sort=${request.sort}`;
   }

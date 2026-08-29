@@ -333,10 +333,11 @@ export class TopicRepository implements TopicDataSourcePort, TopicPrefetchPort {
       if (blocks.length === 0) {
         blocks = [unsupportedBlock('REPLY_CONTENT_EMPTY')];
       }
+      const resolvedParentFloor = (item.parentFloor ?? 0) > 0 ? item.parentFloor : protocolPost?.parentFloor;
       replies.push({
         replyId: item.replyId,
         floor: item.floor,
-        parentFloor: item.parentFloor,
+        parentFloor: resolvedParentFloor,
         author: this.author(protocolPost?.author ?? item.author, protocolPost?.authorId ?? 0,
           protocolPost?.authorAvatarUrl ?? ''),
         postedAtLabel: protocolPost?.postedAtLabel,

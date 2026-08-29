@@ -17,6 +17,8 @@ export struct PaginatedTopicList {
   onRetry: () => void = () => {};
   layoutVariant: TopicListLayoutVariant = TopicListLayoutVariant.LegacyCompact;
   emphasizeTopicTitle: boolean = false;
+  avatarSizeOverride: number = 0;
+  metadataGapOverride: number = 0;
 
   private async loadMore(): Promise<void> {
     await this.viewModel.loadMore();
@@ -55,6 +57,8 @@ export struct PaginatedTopicList {
               topic: topic,
               layoutVariant: this.layoutVariant,
               emphasizeTitle: this.emphasizeTopicTitle,
+              avatarSizeOverride: this.avatarSizeOverride,
+              metadataGapOverride: this.metadataGapOverride,
               semanticId: `${this.semanticPrefix}-topic-${topic.topicId}`,
               onTopicClick: (selected: TopicUiModel) => this.onTopicSelected(selected)
             })
@@ -64,7 +68,7 @@ export struct PaginatedTopicList {
         .id(`${this.semanticPrefix}-topic-list`)
         .width('100%').height('100%')
         .scrollBar(BarState.Off)
-        .cachedCount(6)
+        .cachedCount(3)
       } else {
         LoadStateView({
           state: this.viewModel.state,

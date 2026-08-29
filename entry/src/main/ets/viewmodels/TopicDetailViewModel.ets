@@ -99,6 +99,32 @@ export class TopicDetailViewModel {
     return replies.slice(0, Math.min(this.mountedReplyCount, replies.length));
   }
 
+  async ensureReplyVisible(replyId: number): Promise<number> {
+    if (replyId <= 0) {
+      return -1;
+    }
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const replies = this.presentationDetail?.replies ?? [];
+      for (let index = 0; index < replies.length; index++) {
+        if (replies[index].postId === replyId) {
+          this.mountedReplyCount = Math.max(this.mountedReplyCount, index + 1);
+          return index;
+        }
+      }
+      const detail = this.presentationDetail;
+      if (detail === undefined || detail.nextPageUrl.length === 0 || this.dataSource.loadNextReplyPage === undefined) {
+        return -1;
+      }
+      const previousCount = detail.replies.length;
+      await this.onReplyListReachEnd();
+      const nextCount = this.presentationDetail?.replies.length ?? 0;
+      if (nextCount <= previousCount && !this.loadingMore) {
+        return -1;
+      }
+    }
+    return -1;
+  }
+
   async onReplyListViewport(lastVisibleListIndex: number): Promise<void> {
     // The first four list items are spacer, topic summary, main post and reply summary.
     const visibleReplyIndex = lastVisibleListIndex - 4;

@@ -10,6 +10,15 @@ import {
 const MAX_BLOCKS_PER_POST = 256;
 const MAX_TEXT_PER_BLOCK = 8192;
 
+// Interaction chrome labels that must never surface as post body text. BBS1
+// plugins render 引用/举报/点赞 style actions inside the post tree; when their
+// container classes escape the chrome filter, dropping these exact labels keeps
+// the reading surface clean.
+const CHROME_LABELS = new Set<string>([
+  '引用回复', '引用', '举报', '点赞', '回复', '编辑', '删除', '更多', '分享', '收藏', '打赏',
+  '展开全文', '收起全文'
+]);
+
 class PostContentDraft {
   postId: number = 0;
   floor: number = 0;
@@ -31,11 +40,13 @@ export class TopicContentDecoder {
     let treeDepth = 0;
     let currentPost: PostContentDraft | undefined = undefined;
     let postRootDepth = 0;
+    let avatarRootDepth = 0;
     let authorRootDepth = 0;
     let authorText = '';
     let postMetaRootDepth = 0;
     let postMetaSkipRootDepth = 0;
     let postMetaText = '';
+    let postTimeRootDepth = 0;
     let postContentRootDepth = 0;
     let bodyRootDepth = 0;
     let skippedRootDepth = 0;
@@ -53,6 +64,8 @@ export class TopicContentDecoder {
     let captureText = '';
     let captureUrl = '';
     let captureHasEmbeddedImage = false;
+    let mentionRootDepth = 0;
+    let mentionText = '';
 
     const flushPendingText = (): void => {
       if (currentPost === undefined) {
@@ -119,6 +132,52 @@ export class TopicContentDecoder {
       rewardRootDepth = 0;
     };
 
+    const finishMention = (): void => {
+      if (currentPost !== undefined) {
+        const label = collapseWhitespace(mentionText);
+        if (label.length > 0) {
+          if (currentPost.parentFloor <= 0) {
+            currentPost.parentFloor = this.floorFromMention(label);
+          }
+          // Keep @user #floor with the sentence it introduces. Emitting it as a
+          // standalone Link block is what produced the broken one-line mentions
+          // in the real-device screenshot.
+          pendingText += pendingText.length > 0 ? ` ${label} ` : `${label} `;
+        }
+      }
+      mentionRootDepth = 0;
+      mentionText = '';
+    };
+
+    const resetPostCapture = (): void => {
+      authorRootDepth = 0;
+      authorText = '';
+      avatarRootDepth = 0;
+      postMetaRootDepth = 0;
+      postMetaSkipRootDepth = 0;
+      postMetaText = '';
+      postTimeRootDepth = 0;
+      postContentRootDepth = 0;
+      bodyRootDepth = 0;
+      skippedRootDepth = 0;
+      editedRootDepth = 0;
+      editedText = '';
+      editedLinkRootDepth = 0;
+      editedEditorText = '';
+      rewardRootDepth = 0;
+      rewardText = '';
+      rewardUrl = '';
+      pendingText = '';
+      captureKind = '';
+      captureTag = '';
+      captureRootDepth = 0;
+      captureText = '';
+      captureUrl = '';
+      captureHasEmbeddedImage = false;
+      mentionRootDepth = 0;
+      mentionText = '';
+    };
+
     new LightweightHtmlTokenizer().scan(html, (token: HtmlToken) => {
       if (token.type === HtmlTokenType.START_TAG) {
         const structural = !token.selfClosing && !this.isVoidTag(token.name);
@@ -126,8 +185,20 @@ export class TopicContentDecoder {
           treeDepth++;
         }
 
-        if (currentPost === undefined) {
-          if (token.name === 'li' && hasClass(token.attributes, 'post-entry')) {
+        if (token.name === 'li' && hasClass(token.attributes, 'post-entry')) {
+          if (currentPost !== undefined) {
+            finishMention();
+            finishCapture();
+            flushPendingText();
+            this.finalizePost(currentPost, posts);
+            // A new post-entry is a sibling even when the previous <li> was
+            // implicitly closed. Restore the known root depth to prevent the
+            // tokenizer's unmatched descendants from poisoning later posts.
+            treeDepth = postRootDepth;
+            currentPost = undefined;
+            resetPostCapture();
+          }
+          if (currentPost === undefined) {
             currentPost = new PostContentDraft();
             currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
             currentPost.floor = parseFirstUnsigned(token.attributes.get('data-floor') ?? '');
@@ -139,15 +210,22 @@ export class TopicContentDecoder {
           return;
         }
 
+        if (currentPost === undefined) {
+          return;
+        }
+
         if (token.name === 'a' && hasClass(token.attributes, 'post-author') && postContentRootDepth === 0) {
           authorRootDepth = treeDepth;
           authorText = '';
           currentPost.authorId = this.userIdFromUrl(token.attributes.get('href') ?? '');
           return;
         }
-        if (token.name === 'img' && hasClass(token.attributes, 'avatar-img') && postContentRootDepth === 0 &&
-          currentPost.authorAvatarUrl.length === 0) {
-          currentPost.authorAvatarUrl = this.normalizeUrl(token.attributes.get('src') ?? '');
+        if (postContentRootDepth === 0 && hasClass(token.attributes, 'post-avatar') && !token.selfClosing) {
+          avatarRootDepth = treeDepth;
+        }
+        if (token.name === 'img' && postContentRootDepth === 0 && currentPost.authorAvatarUrl.length === 0 &&
+          (avatarRootDepth > 0 || hasClass(token.attributes, 'avatar-img'))) {
+          currentPost.authorAvatarUrl = this.imageSource(token.attributes);
           return;
         }
         if (token.name === 'div' && hasClass(token.attributes, 'post-meta') && postContentRootDepth === 0) {
@@ -157,6 +235,11 @@ export class TopicContentDecoder {
         }
         if (postMetaRootDepth > 0 && hasClass(token.attributes, 'quote-threads-reference')) {
           postMetaSkipRootDepth = treeDepth;
+          return;
+        }
+        if (postMetaRootDepth > 0 && postMetaSkipRootDepth === 0 && postTimeRootDepth === 0 &&
+          token.name === 'span' && hasClass(token.attributes, 'post-time')) {
+          postTimeRootDepth = treeDepth;
           return;
         }
         if (token.name === 'div' && hasClass(token.attributes, 'post-content') && postContentRootDepth === 0) {
@@ -227,6 +310,10 @@ export class TopicContentDecoder {
           return;
         }
 
+        if (mentionRootDepth > 0) {
+          return;
+        }
+
         if (token.name === 'p') {
           flushPendingText();
         } else if (this.isHeadingTag(token.name)) {
@@ -238,6 +325,9 @@ export class TopicContentDecoder {
         } else if (token.name === 'br') {
           flushPendingText();
           this.addBlock(currentPost, 'LineBreak', '', '', '');
+        } else if (token.name === 'a' && this.isFloorMention(token)) {
+          mentionRootDepth = treeDepth;
+          mentionText = '';
         } else if (token.name === 'a') {
           flushPendingText();
           captureKind = 'Link';
@@ -290,7 +380,9 @@ export class TopicContentDecoder {
         }
         if (authorRootDepth > 0) {
           authorText += token.text;
-        } else if (postMetaRootDepth > 0 && postMetaSkipRootDepth === 0) {
+        } else if (postMetaRootDepth > 0 && postMetaSkipRootDepth === 0 && postTimeRootDepth > 0) {
+          // Only the post-time span feeds the displayed time; badge, UID and
+          // action text inside post-meta must not leak into the time label.
           postMetaText += token.text;
         } else if (editedRootDepth > 0) {
           editedText += token.text;
@@ -299,6 +391,8 @@ export class TopicContentDecoder {
           }
         } else if (rewardRootDepth > 0) {
           rewardText += token.text;
+        } else if (mentionRootDepth > 0) {
+          mentionText += token.text;
         } else if (skippedRootDepth === 0 && postContentRootDepth > 0) {
           if (captureKind.length > 0) {
             if (captureText.length < MAX_TEXT_PER_BLOCK) {
@@ -327,12 +421,22 @@ export class TopicContentDecoder {
         authorText = '';
         authorRootDepth = 0;
       }
+      if (avatarRootDepth > 0 && treeDepth === avatarRootDepth) {
+        avatarRootDepth = 0;
+      }
+      if (mentionRootDepth > 0 && treeDepth === mentionRootDepth && token.name === 'a') {
+        finishMention();
+      }
       if (postMetaSkipRootDepth > 0 && treeDepth === postMetaSkipRootDepth) {
         postMetaSkipRootDepth = 0;
+      }
+      if (postTimeRootDepth > 0 && treeDepth === postTimeRootDepth && token.name === 'span') {
+        postTimeRootDepth = 0;
       }
       if (postMetaRootDepth > 0 && treeDepth === postMetaRootDepth && token.name === 'div') {
         currentPost.postedAtLabel = collapseWhitespace(postMetaText);
         postMetaText = '';
+        postTimeRootDepth = 0;
         postMetaRootDepth = 0;
       }
       if (editedLinkRootDepth > 0 && treeDepth === editedLinkRootDepth && token.name === 'a') {
@@ -358,19 +462,13 @@ export class TopicContentDecoder {
         postContentRootDepth = 0;
       }
       if (postRootDepth > 0 && treeDepth === postRootDepth && token.name === 'li') {
+        finishMention();
         finishCapture();
         flushPendingText();
         this.finalizePost(currentPost, posts);
         currentPost = undefined;
         postRootDepth = 0;
-        authorRootDepth = 0;
-        postMetaRootDepth = 0;
-        postMetaSkipRootDepth = 0;
-        postContentRootDepth = 0;
-        bodyRootDepth = 0;
-        skippedRootDepth = 0;
-        editedRootDepth = 0;
-        rewardRootDepth = 0;
+        resetPostCapture();
       }
       if (treeDepth > 0) {
         treeDepth--;
@@ -378,6 +476,7 @@ export class TopicContentDecoder {
     });
 
     if (currentPost !== undefined) {
+      finishMention();
       finishCapture();
       flushPendingText();
       this.finalizePost(currentPost, posts);
@@ -387,6 +486,9 @@ export class TopicContentDecoder {
 
   private addBlock(post: PostContentDraft, kind: string, text: string, url: string, description: string): void {
     if (post.blocks.length >= MAX_BLOCKS_PER_POST) {
+      return;
+    }
+    if ((kind === 'Paragraph' || kind === 'Link') && CHROME_LABELS.has(text)) {
       return;
     }
     post.blocks.push({ kind: kind, text: text, url: url, description: description });
@@ -430,6 +532,17 @@ export class TopicContentDecoder {
       hasClass(token.attributes, 'post-ops') ||
       hasClass(token.attributes, 'reply-panel') ||
       hasClass(token.attributes, 'replies-login-visible');
+  }
+
+  private isFloorMention(token: HtmlToken): boolean {
+    const href = token.attributes.get('href') ?? '';
+    return hasClass(token.attributes, 'post-floor-mention') ||
+      hasClass(token.attributes, 'post-mention') || href.indexOf('replyid=') >= 0;
+  }
+
+  private floorFromMention(value: string): number {
+    const marker = value.lastIndexOf('#');
+    return marker < 0 ? 0 : parseFirstUnsigned(value.substring(marker + 1));
   }
 
   private isHeadingTag(name: string): boolean {

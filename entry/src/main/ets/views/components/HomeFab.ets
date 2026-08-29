@@ -7,6 +7,7 @@ import {
   IMMERSIVE_ACTION_BAR_BLUR_STRATEGY,
   IMMERSIVE_FAB_BUTTON_SIZE
 } from '../../common/ui/ImmersiveActionBarStyle';
+import { GLASS_STYLE_STORAGE_KEY, GlassStyleMode } from '../../common/ui/GlassStyleParams';
 
 class FabDragOffset {
   x: number;
@@ -39,6 +40,7 @@ export struct HomeFab {
   semanticLabel: string = '发表新主题';
   @Prop maxDragX: number = 0;
   @Prop maxDragY: number = 0;
+  @StorageProp(GLASS_STYLE_STORAGE_KEY) private glassStyle: GlassStyleMode = GlassStyleMode.Translucent;
   @State private dragOffset: FabDragOffset = new FabDragOffset(0, 0);
   private dragStartX: number = 0;
   private dragStartY: number = 0;
@@ -139,7 +141,7 @@ export struct HomeFab {
     return new ActionBarButton({
       width: LengthMetrics.vp(IMMERSIVE_FAB_BUTTON_SIZE),
       backgroundColor: ColorMetrics.resourceColor(Color.Transparent),
-      buttonModifier: buildImmersiveFloatingActionButtonModifier(),
+      buttonModifier: buildImmersiveFloatingActionButtonModifier(this.glassStyle),
       iconSize: LengthMetrics.vp(23),
       iconFillColor: ColorMetrics.resourceColor($r('app.color.fab_compose_bg')),
       baseIconSymbolGlyphModifier: this.iconSymbol(),

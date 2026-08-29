@@ -5,6 +5,7 @@ import { m1Runtime } from '../app/M1Runtime';
 import { ThemeManager } from '../common/theme/ThemeManager';
 import { HomeTopicListLayout } from '../common/theme/HomeTopicListLayout';
 import { TopicListStylePrefs } from '../common/theme/TopicListStylePrefs';
+import { GlassStyle } from '../common/ui/GlassStyleParams';
 import { ImmersiveWindow } from '../common/ui/ImmersiveWindow';
 
 const DOMAIN = 0x0000;
@@ -15,6 +16,7 @@ export default class EntryAbility extends UIAbility {
     m1Runtime.initialize(this.context);
     HomeTopicListLayout.init();
     TopicListStylePrefs.seedDefaults();
+    GlassStyle.init();
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 

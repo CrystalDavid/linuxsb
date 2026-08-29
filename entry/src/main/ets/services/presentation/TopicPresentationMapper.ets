@@ -8,6 +8,7 @@ import {
   UserUiModel
 } from '../../models/presentation/ForumUiModels';
 import { Author, Reply, TopicDetail, TopicPost } from '../../models/TopicModels';
+import { RelativeTime } from '../../common/utils/RelativeTime';
 
 export class TopicPresentationMapper {
   mapSummary(source: TopicSummary): TopicUiModel {
@@ -19,6 +20,24 @@ export class TopicPresentationMapper {
     output.replyCount = source.replyCount ?? -1;
     output.lastReplyUser = source.lastReplyUser ?? '';
     output.lastReplyAt = source.lastReplyAt ?? 0;
+    output.activityTimeLabel = RelativeTime.fromEpochSeconds(output.lastReplyAt);
+    output.replyCountLabel = output.replyCount >= 0 ? `${output.replyCount} 回复` : '';
+    const authorAndReplies: string[] = [];
+    if (output.author.displayName.length > 0) {
+      authorAndReplies.push(output.author.displayName);
+    }
+    if (output.replyCountLabel.length > 0) {
+      authorAndReplies.push(output.replyCountLabel);
+    }
+    output.authorAndRepliesLabel = authorAndReplies.join(' · ');
+    const headerActivity: string[] = [];
+    if (output.activityTimeLabel.length > 0) {
+      headerActivity.push(output.activityTimeLabel);
+    }
+    if (output.replyCountLabel.length > 0) {
+      headerActivity.push(output.replyCountLabel);
+    }
+    output.headerActivityLabel = headerActivity.join(' · ');
     output.isPinned = source.isPinned === true;
     output.isFeatured = source.isFeatured === true;
     output.isHot = source.isHot === true;

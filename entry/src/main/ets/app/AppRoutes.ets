@@ -8,10 +8,12 @@ export const TOPIC_ROUTE: string = 'TopicDetail';
 export const DIAGNOSTICS_ROUTE: string = 'P0Diagnostics';
 export const COMPOSE_ROUTE: string = 'ComposeTopic';
 export const SETTINGS_ROUTE: string = 'Settings';
+export const SEARCH_ROUTE: string = 'Search';
 
 export interface TopicRouteParam {
   topicId: number;
   summary: TopicUiModel;
+  focusReplyId?: number;
 }
 
 function copyUser(source: UserUiModel): UserUiModel {
@@ -47,12 +49,14 @@ export function copyTopicSummary(source: TopicUiModel): TopicUiModel {
   return result;
 }
 
-export function buildTopicRouteParam(topicId: number, source: TopicUiModel | undefined): TopicRouteParam {
+export function buildTopicRouteParam(topicId: number, source: TopicUiModel | undefined,
+  focusReplyId: number = 0): TopicRouteParam {
   const summary = source === undefined ? new TopicUiModel() : copyTopicSummary(source);
   summary.topicId = topicId;
   return {
     topicId: topicId,
-    summary: summary
+    summary: summary,
+    focusReplyId: focusReplyId > 0 ? focusReplyId : undefined
   };
 }
 

@@ -29,7 +29,7 @@ export class SemanticColors {
 
 export class Typography {
   // Fixed text scale: every business-facing Text/Button/TextInput size maps to
-  // one of these 12 values. SymbolGlyph/icon geometry is intentionally separate.
+  // one of these canonical values. SymbolGlyph/icon geometry is intentionally separate.
   static readonly MICRO: number = 11;
   static readonly CAPTION: number = 12;
   static readonly METADATA: number = 13;
@@ -42,6 +42,9 @@ export class Typography {
   static readonly PAGE_TITLE: number = 22;
   static readonly HEADLINE: number = 24;
   static readonly DISPLAY: number = 26;
+  // Four root destinations use the larger Huawei AppGallery-style heading;
+  // pushed subpages deliberately stay on PAGE_TITLE to preserve hierarchy.
+  static readonly ROOT_PAGE_TITLE: number = 28;
 
   // Compatibility names keep older call sites readable while resolving to the
   // same canonical scale above; they do not introduce additional font sizes.
@@ -98,20 +101,25 @@ export class PageMetrics {
   static readonly TOP_BAR_GAP: number = 8;
   static readonly AVATAR_SIZE: number = 48;
   static readonly AVATAR_SMALL: number = 36;
-  static readonly ICON_BUTTON_SIZE: number = 44;
+  static readonly ICON_BUTTON_SIZE: number = 40;
+  static readonly TITLE_ACTION_ICON_SIZE: number = 24;
   static readonly CONTROL_HEIGHT: number = 44;
   static readonly DRAWER_WIDTH: number = 288;
   static readonly DRAWER_EDGE_WIDTH: number = 56;
   static readonly FAB_SIZE: number = 52;
   static readonly REPLY_BAR_HEIGHT: number = 60;
   static readonly BOTTOM_TAB_BAR_HEIGHT: number = 56;
-  static readonly BOTTOM_TAB_BAR_WIDTH: number = 288;
-  static readonly BOTTOM_TAB_ITEM_WIDTH: number = 72;
-  static readonly BOTTOM_TAB_INDICATOR_WIDTH: number = 64;
-  static readonly BOTTOM_TAB_BAR_HORIZONTAL_MARGIN: number = 28;
-  static readonly BOTTOM_TAB_BAR_BOTTOM_MARGIN: number = 4;
-  static readonly BOTTOM_TAB_BAR_RADIUS: number = 31;
+  static readonly BOTTOM_TAB_BAR_WIDTH: number = 264;
+  static readonly BOTTOM_TAB_ITEM_WIDTH: number = 66;
+  static readonly BOTTOM_TAB_INDICATOR_WIDTH: number = 60;
+  static readonly BOTTOM_TAB_BAR_HORIZONTAL_MARGIN: number = 16;
+  static readonly BOTTOM_TAB_BAR_BOTTOM_MARGIN: number = 6;
+  static readonly BOTTOM_TAB_BAR_RADIUS: number = 28;
   static readonly BOTTOM_TAB_BAR_CONTENT_INSET: number = 94;
+  static readonly BOTTOM_DOCK_GAP: number = 8;
+  static readonly BOTTOM_DOCK_ACTION_SIZE: number = 56;
+  static readonly BOTTOM_DOCK_WIDTH: number = 328;
+  static readonly BOTTOM_DOCK_CENTER_OFFSET: number = 32;
   static readonly MEDIA_MAX_HEIGHT: number = 520;
   static readonly SKELETON_TITLE_HEIGHT: number = 16;
   static readonly SKELETON_META_HEIGHT: number = 12;

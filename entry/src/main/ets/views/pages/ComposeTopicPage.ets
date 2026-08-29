@@ -2,25 +2,34 @@ import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import {
   buildImmersiveGlassEffect,
+  buildImmersiveSystemMaterialModifier,
   IMMERSIVE_GLASS_BORDER_WIDTH,
   IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
   IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
+import { GLASS_STYLE_STORAGE_KEY, GlassStyleMode } from '../../common/ui/GlassStyleParams';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
   requiresHdsComponentSafeArea,
   requiresHdsLayoutSafeAreaAvoidance
 } from '../../common/ui/ImmersiveLightMaterial';
+import { insertMarkdownAtCaret, PendingMarkdownInsert } from '../../common/utils/MarkdownInsert';
+import { MAX_IMAGE_PICK_COUNT, pickImagesFromGallery } from '../../common/utils/PhotoPicker';
 import { ForumSummary } from '../../models/HomeModels';
-import { WriteResult } from '../../services/repository/WriteRepository';
+import { AttachmentUploadResult, WriteResult } from '../../services/repository/WriteRepository';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
+import { AttachmentThumbnail } from '../components/AttachmentThumbnail';
 import { ImmersiveGlassTextButton } from '../components/ImmersiveGlassTextButton';
 import {
+  GLASS_ACTION_ARROW_ICON_SIZE,
+  GLASS_ACTION_ARROW_ICON_WEIGHT,
   ImmersiveIconButton,
   TITLE_BAR_BACK_ICON_SIZE,
   TITLE_BAR_BACK_ICON_WEIGHT
 } from '../components/ImmersiveIconButton';
+
+const COMPOSE_ATTACH_BUTTON_SIZE: number = 40;
 
 @Component
 export struct ComposeTopicPage {
@@ -30,12 +39,20 @@ export struct ComposeTopicPage {
   onLogin: () => void = () => {};
   onSubmit: (forumId: number, title: string, body: string) => Promise<WriteResult> =
     async () => ({ ok: false, topicId: 0, message: '写入服务不可用', networkMs: 0 });
+  onUploadImage: (uri: string) => Promise<AttachmentUploadResult> =
+    async () => ({ ok: false, markdown: '', message: '上传服务不可用', networkMs: 0 });
   onCreated: (topicId: number) => void = () => {};
   @State private forumId: number = 0;
   @State private title: string = '';
   @State private body: string = '';
+  @State private attachments: string[] = [];
+  private bodyController: TextAreaController = new TextAreaController();
+  // 与 attachments 平行：选图那一刻正文光标的位置（-1 表示未取到，提交时
+  // 退化为末尾追加，与旧行为一致）。
+  private attachmentInsertOffsets: number[] = [];
   @State private submitting: boolean = false;
   @State private resultMessage: string = '';
+  @StorageProp(GLASS_STYLE_STORAGE_KEY) private glassStyle: GlassStyleMode = GlassStyleMode.Translucent;
 
   aboutToAppear(): void {
     if (this.forumId === 0 && this.catalogViewModel.forums.length > 0) {
@@ -59,6 +76,45 @@ export struct ComposeTopicPage {
     return '';
   }
 
+  private async pickImages(): Promise<void> {
+    if (this.authenticated && this.attachments.length >= MAX_IMAGE_PICK_COUNT) {
+      try {
+        this.getUIContext().getPromptAction().showToast({
+          message: `最多添加 ${MAX_IMAGE_PICK_COUNT} 张图片`,
+          duration: 1600
+        });
+      } catch (_) {}
+      return;
+    }
+    const picked = await pickImagesFromGallery(MAX_IMAGE_PICK_COUNT - this.attachments.length);
+    if (picked.length === 0) {
+      return;
+    }
+    // 快照“点添加图片那一刻”正文光标的位置：用户意图就是在这里插图。
+    const caretOffset = this.currentBodyCaretOffset();
+    for (let index = 0; index < picked.length; index++) {
+      this.attachmentInsertOffsets.push(caretOffset);
+    }
+    this.attachments = this.attachments.concat(picked);
+  }
+
+  private removeAttachment(index: number): void {
+    this.attachments = this.attachments.filter((_uri: string, itemIndex: number) => itemIndex !== index);
+    this.attachmentInsertOffsets = this.attachmentInsertOffsets
+      .filter((_offset: number, itemIndex: number) => itemIndex !== index);
+  }
+
+  private currentBodyCaretOffset(): number {
+    try {
+      const caret = this.bodyController.getCaretOffset();
+      if (caret.index >= 0 && caret.index <= this.body.length) {
+        return caret.index;
+      }
+    } catch (_) {
+    }
+    return -1;
+  }
+
   private requestSubmit(): void {
     const message = this.validate();
     if (message.length > 0) {
@@ -68,9 +124,11 @@ export struct ComposeTopicPage {
       }
       return;
     }
+    const imageHint = this.attachments.length > 0 ?
+      `所选 ${this.attachments.length} 张图片将随正文一并上传。` : '';
     AlertDialog.show({
       title: '确认发表主题',
-      message: '内容将真实发布到 linux.sb。请确认板块、标题和正文无误。',
+      message: `内容将真实发布到 linux.sb。请确认板块、标题和正文无误。${imageHint}`,
       primaryButton: {
         value: '取消',
         action: () => {}
@@ -89,7 +147,27 @@ export struct ComposeTopicPage {
     }
     this.submitting = true;
     this.resultMessage = '';
-    const result = await this.onSubmit(this.forumId, this.title, this.body);
+    // 并发上传：多张图同时发起，避免串行往返把发帖拖慢。
+    const pending: Promise<AttachmentUploadResult>[] = [];
+    for (let index = 0; index < this.attachments.length; index++) {
+      pending.push(this.onUploadImage(this.attachments[index]));
+    }
+    const uploads: AttachmentUploadResult[] = await Promise.all(pending);
+    const pendingInserts: PendingMarkdownInsert[] = [];
+    for (let index = 0; index < uploads.length; index++) {
+      const uploaded = uploads[index];
+      if (!uploaded.ok) {
+        this.submitting = false;
+        this.resultMessage = uploaded.message;
+        return;
+      }
+      const caretOffset = index < this.attachmentInsertOffsets.length ?
+        this.attachmentInsertOffsets[index] : -1;
+      pendingInserts.push({ caretOffset: caretOffset, markdown: uploaded.markdown, pickOrder: index });
+    }
+    // 图片按各自选图时的光标位置插入正文，而不是一律追加到末尾。
+    const finalBody = insertMarkdownAtCaret(this.body, pendingInserts);
+    const result = await this.onSubmit(this.forumId, this.title, finalBody);
     this.submitting = false;
     if (!result.ok) {
       this.resultMessage = result.message;
@@ -164,14 +242,24 @@ export struct ComposeTopicPage {
               .width('100%')
               .height(40)
               .padding({ left: Spacing.XS, right: Spacing.XS })
+              // Unselected chips reuse the bottom tab tray recipe: one shared
+              // 16vp/1.05/1.0 frosted sample layer with the 1.25vp highlight edge.
               .backgroundColor(this.forumId === forum.forumId ?
-                $r('app.color.compose_forum_selected_bg') : $r('app.color.liquid_glass_bg'))
+                $r('app.color.compose_forum_selected_bg') : Color.Transparent)
+              .backgroundEffect(this.forumId === forum.forumId ? undefined : buildImmersiveGlassEffect(this.glassStyle))
               .border({
                 width: IMMERSIVE_GLASS_BORDER_WIDTH,
                 color: this.forumId === forum.forumId ?
-                  $r('app.color.brand_primary') : $r('app.color.liquid_glass_highlight')
+                  $r('app.color.brand_primary') : $r('app.color.bottom_tab_bar_highlight')
               })
               .borderRadius(Radius.PILL)
+              .shadow({
+                radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+                color: $r('app.color.bottom_tab_bar_shadow'),
+                offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+              })
+              .attributeModifier(buildImmersiveSystemMaterialModifier(
+                this.glassStyle, this.forumId !== forum.forumId))
               .hoverEffect(HoverEffect.None)
               .onClick(() => { this.forumId = forum.forumId; })
             }
@@ -219,6 +307,47 @@ export struct ComposeTopicPage {
     .padding({ left: Spacing.XS, right: Spacing.XS })
   }
 
+  @Builder
+  private attachmentPicker() {
+    Column({ space: Spacing.XS }) {
+      Row({ space: Spacing.XS }) {
+        ImmersiveIconButton({
+          icon: $r('sys.symbol.plus'),
+          semanticId: 'compose-attach',
+          semanticLabel: '添加图片',
+          buttonSize: COMPOSE_ATTACH_BUTTON_SIZE,
+          iconSize: GLASS_ACTION_ARROW_ICON_SIZE,
+          iconWeight: GLASS_ACTION_ARROW_ICON_WEIGHT,
+          iconColor: $r('app.color.brand_primary'),
+          onAction: () => this.pickImages()
+        })
+        Text('添加图片')
+          .fontSize(Typography.CAPTION)
+          .fontColor(SemanticColors.textSecondary())
+        Blank()
+      }
+      .id('compose-attach-row')
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      if (this.attachments.length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.attachments, (uri: string, index: number) => {
+            AttachmentThumbnail({
+              uri: uri,
+              semanticId: `compose-attachment-${index}`,
+              onRemove: () => this.removeAttachment(index)
+            })
+              .margin({ right: Spacing.SM, bottom: Spacing.SM })
+          }, (uri: string, index: number) => `${uri}-${index}`)
+        }
+        .id('compose-attachment-strip')
+        .width('100%')
+      }
+    }
+    .width('100%')
+  }
+
   build() {
     HdsNavigation() {
       Stack({ alignContent: Alignment.Top }) {
@@ -239,7 +368,7 @@ export struct ComposeTopicPage {
                 .fontColor(SemanticColors.textPrimary())
                 .placeholderColor(SemanticColors.textSecondary())
                 .caretColor($r('app.color.brand_primary'))
-                .backgroundEffect(buildImmersiveGlassEffect())
+                .backgroundEffect(buildImmersiveGlassEffect(this.glassStyle))
                 .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
                   color: $r('app.color.bottom_tab_bar_highlight') })
                 .borderRadius(Radius.MD)
@@ -248,8 +377,9 @@ export struct ComposeTopicPage {
                   color: $r('app.color.bottom_tab_bar_shadow'),
                   offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
                 })
+                .attributeModifier(buildImmersiveSystemMaterialModifier(this.glassStyle))
                 .onChange((value: string) => { this.title = value; })
-              TextArea({ text: this.body, placeholder: '写下正文…' })
+              TextArea({ text: this.body, placeholder: '写下正文…', controller: this.bodyController })
                 .id('compose-body')
                 .width('100%')
                 .constraintSize({ minHeight: 260 })
@@ -258,7 +388,7 @@ export struct ComposeTopicPage {
                 .fontColor(SemanticColors.textPrimary())
                 .placeholderColor(SemanticColors.textSecondary())
                 .caretColor($r('app.color.brand_primary'))
-                .backgroundEffect(buildImmersiveGlassEffect())
+                .backgroundEffect(buildImmersiveGlassEffect(this.glassStyle))
                 .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH,
                   color: $r('app.color.bottom_tab_bar_highlight') })
                 .borderRadius(Radius.MD)
@@ -267,7 +397,9 @@ export struct ComposeTopicPage {
                   color: $r('app.color.bottom_tab_bar_shadow'),
                   offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
                 })
+                .attributeModifier(buildImmersiveSystemMaterialModifier(this.glassStyle))
                 .onChange((value: string) => { this.body = value; })
+              this.attachmentPicker()
               this.forumSelector()
               if (this.resultMessage.length > 0) {
                 Text(this.resultMessage)
@@ -278,7 +410,7 @@ export struct ComposeTopicPage {
               Blank().height(32)
             }
             .width('100%')
-            .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.LG })
+            .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.SM })
             .alignItems(HorizontalAlign.Start)
           }
           .width('100%').height('100%')

@@ -8,6 +8,7 @@ import { TopicListLayoutVariant } from '../../common/theme/TopicListStylePrefs';
 import { immersiveTitleBarContentTopSpacer } from '../../common/ui/ImmersiveTitleBarLayout';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import { shouldAutoLoadNextHomePage } from '../../common/ui/HomePaginationPolicy';
+import { GLASS_STYLE_STORAGE_KEY, GlassStyleMode } from '../../common/ui/GlassStyleParams';
 import {
   ImmersiveLightArea,
   requiresHdsComponentSafeArea,
@@ -20,15 +21,9 @@ import { TopicListDataSource } from '../../models/presentation/TopicListDataSour
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { LoadStateView } from '../components/LoadStateView';
-import {
-  CompactSegmentedControl,
-  SegmentOption,
-  TITLE_BAR_SEGMENT_HEIGHT,
-  TITLE_BAR_SEGMENT_LABEL_SIZE,
-  TITLE_BAR_SEGMENT_WIDTH
-} from '../components/CompactSegmentedControl';
+import { FeedFilterButton, FeedFilterMenu, feedSortLabel } from '../components/FeedFilter';
 import { TopicListItem } from '../components/TopicListItem';
-import { HomeFab } from '../components/HomeFab';
+import { ImmersiveIconButton } from '../components/ImmersiveIconButton';
 
 @Component({ freezeWhenInactive: true })
 export struct HomePage {
@@ -39,11 +34,14 @@ export struct HomePage {
   onOpenDiagnostics: () => void = () => {};
   onPrefetch: (topicIds: number[]) => void = () => {};
   onCancelPrefetch: () => void = () => {};
-  onCompose: () => void = () => {};
+  onSearch: () => void = () => {};
+  @Prop @Watch('onHomeIconAction') homeIconActionGeneration: number = 0;
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
+  @StorageProp(GLASS_STYLE_STORAGE_KEY) private glassStyle: GlassStyleMode = GlassStyleMode.Translucent;
   @StorageLink(HOME_TOPIC_LIST_LAYOUT_STORAGE_KEY) private homeTopicListLayout: string =
     HomeTopicListLayoutMode.TitleFirst;
   @State private selectedSort: FeedSort = FeedSort.NewComments;
+  @State private showQuickMenu: boolean = false;
   @State private contentWidth: number = 0;
   @State private contentHeight: number = 0;
   private listScroller: Scroller = new Scroller();
@@ -83,6 +81,26 @@ export struct HomePage {
     await this.load(false);
   }
 
+  private onHomeIconAction(): void {
+    this.showQuickMenu = false;
+    if (this.firstVisibleTopicIndex > 0 || this.listIsScrolling) {
+      this.listScroller.scrollToIndex(0, true, ScrollAlign.START);
+      this.firstVisibleTopicIndex = 0;
+      return;
+    }
+    this.load(true);
+  }
+
+  private async changeQuickFeed(sort: FeedSort): Promise<void> {
+    this.showQuickMenu = false;
+    if (sort === FeedSort.Footprint && !this.viewModel.currentUser) {
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '登录后才能查看足迹', duration: 1600 });
+      } catch (_) {}
+    }
+    await this.changeSort(sort);
+  }
+
   private async loadMore(): Promise<void> {
     const previousCount = this.topicDataSource.totalCount();
     await this.viewModel.loadMore();
@@ -119,19 +137,12 @@ export struct HomePage {
     this.onPrefetch(ids);
   }
 
-  private sortOptions(): SegmentOption[] {
-    return [
-      new SegmentOption('新评论', 'home-sort-comments'),
-      new SegmentOption('新帖子', 'home-sort-topics')
-    ];
-  }
-
   @Builder
   private titleBarContent() {
     Row({ space: Spacing.SM }) {
       Text('烧饼社区')
         .id('home-page-title')
-        .fontSize(Typography.PAGE_TITLE)
+        .fontSize(Typography.ROOT_PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .maxLines(1)
@@ -144,21 +155,35 @@ export struct HomePage {
             })
         )
         .layoutWeight(1)
-      CompactSegmentedControl({
-        options: this.sortOptions(),
-        selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
-        segmentWidth: TITLE_BAR_SEGMENT_WIDTH,
-        controlHeight: TITLE_BAR_SEGMENT_HEIGHT,
-        labelFontSize: TITLE_BAR_SEGMENT_LABEL_SIZE,
-        semanticId: 'home-sort-control',
-        onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
+      ImmersiveIconButton({
+        icon: $r('sys.symbol.magnifyingglass'),
+        semanticId: 'home-search-action',
+        semanticLabel: '搜索',
+        buttonSize: PageMetrics.ICON_BUTTON_SIZE,
+        iconSize: PageMetrics.TITLE_ACTION_ICON_SIZE,
+        iconWeight: 600,
+        iconColor: SemanticColors.textPrimary(),
+        onAction: () => this.onSearch()
       })
-        .translate({ y: -2 })
+      FeedFilterButton({
+        label: feedSortLabel(this.selectedSort),
+        semanticId: 'home-sort-filter',
+        onAction: () => { this.showQuickMenu = !this.showQuickMenu; }
+      })
     }
     .width('100%')
     .height('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD })
     .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  private quickFeedMenu() {
+    FeedFilterMenu({
+      selectedSort: this.selectedSort,
+      semanticPrefix: 'home',
+      onSelect: (sort: FeedSort) => this.changeQuickFeed(sort)
+    })
   }
 
   @Builder
@@ -223,7 +248,9 @@ export struct HomePage {
         .position({ x: 0, y: -immersiveTitleBarContentTopSpacer(this.topInset) })
         .clip(false)
         .scrollBar(BarState.Off)
-        .cachedCount(6)
+        // Three rows are enough to hide node creation without decoding a large
+        // second screen of remote avatars during every fast fling.
+        .cachedCount(3)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .onScrollStart(() => {
           this.listIsScrolling = true;
@@ -268,14 +295,15 @@ export struct HomePage {
           .padding({ top: immersiveTitleBarContentTopSpacer(this.topInset), bottom: this.bottomContentInset })
       }
 
-      HomeFab({
-        onAction: () => this.onCompose(),
-        maxDragX: Math.max(0, this.contentWidth - PageMetrics.FAB_SIZE - Spacing.XXXL),
-        maxDragY: Math.max(0, this.contentHeight - this.topInset - this.bottomContentInset -
-          PageMetrics.FAB_SIZE - Spacing.XXXL)
-      })
-        .margin({ right: Spacing.LG, bottom: this.bottomContentInset + Spacing.XXXL + Spacing.SM })
-        .zIndex(4)
+      if (this.showQuickMenu) {
+        Row() {
+          this.quickFeedMenu()
+        }
+          .width(148)
+          .position({ x: Math.max(0, this.contentWidth - 164), y: Spacing.SM })
+          .zIndex(8)
+      }
+
     }
     .id('home-page')
     .width('100%').height('100%')
@@ -293,7 +321,7 @@ export struct HomePage {
     .titleBar({
       avoidLayoutSafeArea: requiresHdsLayoutSafeAreaAvoidance(ImmersiveLightArea.TITLE_BAR),
       enableComponentSafeArea: requiresHdsComponentSafeArea(ImmersiveLightArea.TITLE_BAR),
-      style: buildImmersiveTitleBarStyle({ enableRefreshOffsetChange: true }),
+      style: buildImmersiveTitleBarStyle(),
       content: { stackBuilder: () => { this.titleBarContent(); } }
     })
     .bindToScrollable([this.listScroller])

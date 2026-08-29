@@ -602,14 +602,30 @@ export class HomeProbeDecoder {
   }
 
   private applyRank(value: string, user: CurrentUserDraft): void {
-    const marker = ' · 积分 ';
-    const offset = value.indexOf(marker);
+    const marker = '积分';
+    const offset = value.lastIndexOf(marker);
     if (offset < 0) {
-      user.groupName = value;
+      user.groupName = this.normalizeRankTitle(value);
       return;
     }
-    user.groupName = value.substring(0, offset).trim();
+    user.groupName = this.normalizeRankTitle(value.substring(0, offset));
     user.points = this.parsePositiveNumber(value.substring(offset + marker.length).trim());
+  }
+
+  private normalizeRankTitle(value: string): string {
+    let output = value.trim();
+    while (output.endsWith('·') || output.endsWith('｜') || output.endsWith('|')) {
+      output = output.substring(0, output.length - 1).trim();
+    }
+    const rarities = ['SSR', 'SR', 'UR', 'R', 'N'];
+    for (let index = 0; index < rarities.length; index++) {
+      const rarity = rarities[index];
+      if (output.toUpperCase().endsWith(rarity) && output.length > rarity.length) {
+        const prefix = output.substring(0, output.length - rarity.length).trim();
+        return `${prefix} ${rarity}`;
+      }
+    }
+    return output;
   }
 
   private captureStatus(token: HtmlToken, draft: HomeTopicDraft): void {

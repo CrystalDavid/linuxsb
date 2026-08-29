@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { Typography } from '../../common/theme/DesignSystem';
+import { SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import { LoginProbePage } from '../../services/auth/LoginProbePage';
 import { AuthenticatedSessionProbeResult, SessionProbe } from '../../services/auth/SessionProbe';
 import { ProbeDecodeTaskRunner } from '../../services/protocol/ProbeDecodeTask';
@@ -479,7 +479,7 @@ export struct P0ProbePage {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
           .padding(16)
-          .backgroundColor(Color.White)
+          .backgroundColor(SemanticColors.page())
           .borderRadius(16)
 
           Column({ space: 10 }) {
@@ -538,7 +538,7 @@ export struct P0ProbePage {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
           .padding(16)
-          .backgroundColor(Color.White)
+          .backgroundColor(SemanticColors.page())
           .borderRadius(16)
 
           Column({ space: 10 }) {
@@ -570,7 +570,7 @@ export struct P0ProbePage {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
           .padding(16)
-          .backgroundColor(Color.White)
+          .backgroundColor(SemanticColors.page())
           .borderRadius(16)
 
           Column({ space: 10 }) {
@@ -588,7 +588,7 @@ export struct P0ProbePage {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
           .padding(16)
-          .backgroundColor(Color.White)
+          .backgroundColor(SemanticColors.page())
           .borderRadius(16)
 
           Flex({ wrap: FlexWrap.Wrap }) {
@@ -607,7 +607,7 @@ export struct P0ProbePage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor('#F2F4F7')
+      .backgroundColor(SemanticColors.page())
       .scrollBar(BarState.Auto)
     }
   }

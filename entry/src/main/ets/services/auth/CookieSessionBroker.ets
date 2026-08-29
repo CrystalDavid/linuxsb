@@ -49,7 +49,21 @@ export class CookieSessionBroker {
     if (equals < 0 || equals + 1 >= pair.length) {
       return undefined;
     }
-    return pair.substring(equals + 1);
+    return this.decodeCookieValue(pair.substring(equals + 1));
+  }
+
+  // Cookie 值通常按 URL 编码存储（例如 '=' 写成 %3D、'/' 写成 %2F）。表单
+  // 字段必须送解码后的原文，否则服务端拿到的 _csrf 与会话里的值不一致，
+  // 写操作会被 403 拒绝。不含 '%' 时原样返回，不引入额外副作用。
+  private decodeCookieValue(value: string): string {
+    if (value.indexOf('%') < 0) {
+      return value;
+    }
+    try {
+      return decodeURIComponent(value);
+    } catch (_) {
+      return value;
+    }
   }
 
   clearMemory(): void {

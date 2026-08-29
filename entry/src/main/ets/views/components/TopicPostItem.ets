@@ -8,6 +8,7 @@ export struct TopicPostItem {
   post: PostUiModel = new PostUiModel();
   mainPost: boolean = false;
   onReply: (post: PostUiModel) => void = () => {};
+  onReport: (post: PostUiModel) => void = () => {};
 
   private authorName(): string {
     return this.post.author.displayName.length > 0 ? this.post.author.displayName : '社区用户';
@@ -70,21 +71,9 @@ export struct TopicPostItem {
   }
 
   @Builder
-  private threadContext() {
-    if (this.isThreadedReply()) {
-      Text(`回复 #${this.post.parentFloor}`)
-        .id(`reply-thread-indicator-${this.post.floor}`)
-        .fontSize(Typography.CAPTION)
-        .fontColor(AppColors.brandPrimary())
-        .margin({ top: Spacing.XS, bottom: Spacing.XS })
-    }
-  }
-
-  @Builder
   private bodyColumn() {
     Column({ space: 0 }) {
       this.authorHeader()
-      this.threadContext()
       PostRichContent({ blocks: this.post.content, semanticPrefix: `post-content-${this.post.postId}` })
         .width('100%')
         .margin({ top: this.isThreadedReply() ? 0 : Spacing.SM })
@@ -96,24 +85,49 @@ export struct TopicPostItem {
           .margin({ top: Spacing.SM })
       }
       if (!this.mainPost) {
-        Row() {
+        Row({ space: Spacing.XS }) {
           Blank()
-          Button({ type: ButtonType.Capsule, stateEffect: true }) {
-            Row({ space: Spacing.XXS }) {
-              SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
-                .fontSize(15)
-                .fontColor([SemanticColors.textTertiary()])
-              Text('回复')
-                .fontSize(Typography.CAPTION)
-                .fontColor(SemanticColors.textTertiary())
-            }
+          Button({ type: ButtonType.Capsule, stateEffect: false }) {
+            SymbolGlyph($r('sys.symbol.heart'))
+              .fontSize(15)
+              .fontColor([SemanticColors.textTertiary()])
           }
-          .id(`reply-action-${this.post.floor}`)
+          .id(`reply-like-${this.post.floor}`)
+          .accessibilityText('点赞')
           .height(30)
           .padding({ left: Spacing.SM, right: Spacing.SM })
           .backgroundColor(Color.Transparent)
           .borderRadius(Radius.PILL)
           .clip(true)
+          .hoverEffect(HoverEffect.None)
+          .onClick(() => this.requestLike())
+          Button({ type: ButtonType.Capsule, stateEffect: false }) {
+            SymbolGlyph($r('sys.symbol.flag'))
+              .fontSize(15)
+              .fontColor([SemanticColors.textTertiary()])
+          }
+          .id(`reply-report-${this.post.floor}`)
+          .accessibilityText('举报')
+          .height(30)
+          .padding({ left: Spacing.SM, right: Spacing.SM })
+          .backgroundColor(Color.Transparent)
+          .borderRadius(Radius.PILL)
+          .clip(true)
+          .hoverEffect(HoverEffect.None)
+          .onClick(() => this.onReport(this.post))
+          Button({ type: ButtonType.Capsule, stateEffect: false }) {
+            SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
+              .fontSize(15)
+              .fontColor([SemanticColors.textTertiary()])
+          }
+          .id(`reply-action-${this.post.floor}`)
+          .accessibilityText('回复')
+          .height(30)
+          .padding({ left: Spacing.SM, right: Spacing.SM })
+          .backgroundColor(Color.Transparent)
+          .borderRadius(Radius.PILL)
+          .clip(true)
+          .hoverEffect(HoverEffect.None)
           .onClick(() => this.onReply(this.post))
         }
         .width('100%')
@@ -122,6 +136,12 @@ export struct TopicPostItem {
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
+  }
+
+  private requestLike(): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '官方点赞打赏功能暂未接入', duration: 1600 });
+    } catch (_) {}
   }
 
   build() {

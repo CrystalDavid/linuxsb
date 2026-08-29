@@ -21,6 +21,11 @@ import {
   TITLE_BAR_BACK_ICON_SIZE,
   TITLE_BAR_BACK_ICON_WEIGHT
 } from '../components/ImmersiveIconButton';
+import {
+  DEVELOPER_SUPPORT_PRODUCTS,
+  DeveloperSupportProduct,
+  developerSupportService
+} from '../../services/payment/DeveloperSupportService';
 
 enum SettingsSection {
   Overview = 0,
@@ -28,10 +33,108 @@ enum SettingsSection {
   HomeLayout = 2
 }
 
-const SETTINGS_GROUP_RADIUS: number = 24;
-const SETTINGS_ROW_HEIGHT: number = 72;
+const SETTINGS_GROUP_RADIUS: number = 18;
+const SETTINGS_ROW_HEIGHT: number = 56;
 const THEME_PREVIEW_HEIGHT: number = 250;
 const LAYOUT_PREVIEW_HEIGHT: number = 118;
+
+@CustomDialog
+struct DeveloperSupportDialog {
+  controller?: CustomDialogController;
+  onPurchase: (product: DeveloperSupportProduct) => void = () => {};
+
+  @Builder
+  private supportProductRow(product: DeveloperSupportProduct, index: number) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row({ space: Spacing.MD }) {
+        SymbolGlyph($r('sys.symbol.gift'))
+          .fontSize(24)
+          .fontWeight(FontWeight.Medium)
+          .fontColor([SemanticColors.textPrimary()])
+        Text(product.label)
+          .fontSize(Typography.BODY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(SemanticColors.textPrimary())
+          .maxLines(1)
+        Blank()
+        Text(product.priceLabel)
+          .width(112)
+          .height(38)
+          .fontSize(Typography.BODY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.support_price_text'))
+          .textAlign(TextAlign.Center)
+          .backgroundColor($r('app.color.support_price_bg'))
+          .borderRadius(Radius.PILL)
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: Spacing.LG, right: Spacing.LG })
+      .alignItems(VerticalAlign.Center)
+    }
+    .id(`developer-support-product-${index}`)
+    .accessibilityText(`${product.label}，${product.priceLabel}，一次性支付`)
+    .width('100%')
+    .height(56)
+    .padding(0)
+    .backgroundColor(Color.Transparent)
+    .borderRadius(Radius.MD)
+    .onClick(() => {
+      this.controller?.close();
+      this.onPurchase(product);
+    })
+  }
+
+  build() {
+    Column({ space: Spacing.MD }) {
+      Row() {
+        Column({ space: Spacing.XS }) {
+          Text('投喂开发者')
+            .fontSize(Typography.PAGE_TITLE)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(SemanticColors.textPrimary())
+          Text('感谢支持这个非官方客户端，以下均为一次性支付，不会自动续费')
+            .fontSize(Typography.CAPTION)
+            .fontColor(SemanticColors.textSecondary())
+            .maxLines(2)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(20)
+            .fontWeight(FontWeight.Medium)
+            .fontColor([SemanticColors.textPrimary()])
+        }
+        .id('developer-support-close')
+        .accessibilityText('关闭投喂弹窗')
+        .width(40)
+        .height(40)
+        .padding(0)
+        .backgroundColor(SemanticColors.surfaceMuted())
+        .onClick(() => this.controller?.close())
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      Column() {
+        ForEach(DEVELOPER_SUPPORT_PRODUCTS, (product: DeveloperSupportProduct, index: number) => {
+          this.supportProductRow(product, index)
+          if (index + 1 < DEVELOPER_SUPPORT_PRODUCTS.length) {
+            Divider()
+              .strokeWidth(0.5)
+              .color(SemanticColors.outline())
+              .margin({ left: 52, right: Spacing.LG })
+          }
+        }, (product: DeveloperSupportProduct) => product.productId)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding({ left: Spacing.LG, right: Spacing.LG, top: Spacing.XL, bottom: Spacing.XXL })
+    .backgroundColor($r('app.color.settings_overview_card_bg'))
+    .borderRadius({ topLeft: 28, topRight: 28 })
+  }
+}
 
 @Component
 struct SettingsSelectionMark {
@@ -63,11 +166,13 @@ struct SettingsSelectionMark {
 @Component
 export struct SettingsPage {
   onBack: () => void = () => {};
+  onFeedback: () => void = () => {};
   @State private selectedThemeMode: AppThemeMode = AppThemeMode.System;
   @State private selectedHomeTopicListLayout: HomeTopicListLayoutMode =
     HomeTopicListLayoutMode.TitleFirst;
   @State private section: SettingsSection = SettingsSection.Overview;
   @StorageProp(APP_IS_DARK_STORAGE_KEY) private effectiveIsDark: boolean = false;
+  private supportDialogController: CustomDialogController | undefined = undefined;
 
   aboutToAppear(): void {
     this.selectedThemeMode = ThemeManager.currentMode();
@@ -128,6 +233,26 @@ export struct SettingsPage {
     HomeTopicListLayout.setMode(mode);
   }
 
+  private openDeveloperSupport(): void {
+    this.supportDialogController = new CustomDialogController({
+      builder: DeveloperSupportDialog({
+        onPurchase: (product: DeveloperSupportProduct) => this.purchaseDeveloperSupport(product)
+      }),
+      autoCancel: true,
+      customStyle: true,
+      alignment: DialogAlignment.Bottom
+    });
+    this.supportDialogController.open();
+  }
+
+  private async purchaseDeveloperSupport(product: DeveloperSupportProduct): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const result = await developerSupportService.purchase(context, product);
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: result.message, duration: 2200 });
+    } catch (_) {}
+  }
+
   @Builder
   private titleBar() {
     Row({ space: Spacing.SM }) {
@@ -164,11 +289,11 @@ export struct SettingsPage {
           .maxLines(1)
         Blank()
         Text(value)
-          .fontSize(Typography.BODY)
+          .fontSize(Typography.LIST_TITLE)
           .fontColor(SemanticColors.textSecondary())
           .maxLines(1)
         SymbolGlyph($r('sys.symbol.chevron_right'))
-          .fontSize(18)
+          .fontSize(20)
           .fontWeight(FontWeight.Medium)
           .fontColor([SemanticColors.textTertiary()])
       }
@@ -185,6 +310,40 @@ export struct SettingsPage {
     .backgroundColor(Color.Transparent)
     .borderRadius(0)
     .onClick(() => this.section = target)
+  }
+
+  @Builder
+  private actionSettingRow(title: string, value: string, semanticId: string, onAction: () => void) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row({ space: Spacing.SM }) {
+        Text(title)
+          .fontSize(Typography.TOPIC_TITLE)
+          .fontWeight(500)
+          .fontColor(SemanticColors.textPrimary())
+          .maxLines(1)
+        Blank()
+        Text(value)
+          .fontSize(Typography.LIST_TITLE)
+          .fontColor(SemanticColors.textSecondary())
+          .maxLines(1)
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium)
+          .fontColor([SemanticColors.textTertiary()])
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: Spacing.LG, right: Spacing.MD })
+      .alignItems(VerticalAlign.Center)
+    }
+    .id(semanticId)
+    .accessibilityText(`${title}，${value}`)
+    .width('100%')
+    .height(SETTINGS_ROW_HEIGHT)
+    .padding(0)
+    .backgroundColor(Color.Transparent)
+    .borderRadius(0)
+    .onClick(onAction)
   }
 
   @Builder
@@ -411,22 +570,31 @@ export struct SettingsPage {
   @Builder
   private overviewPage() {
     Scroll() {
-      Column({ space: Spacing.MD }) {
-        Text('显示与布局')
-          .fontSize(Typography.BODY_SMALL)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(SemanticColors.textSecondary())
-          .width('100%')
+      Column({ space: Spacing.LG }) {
         Column() {
           this.settingRow('外观主题', this.themeModeLabel(), 'settings-theme-row', SettingsSection.Theme)
           Divider()
-            .color(SemanticColors.divider())
+            .strokeWidth(0.5)
+            .color(SemanticColors.outline())
             .margin({ left: Spacing.LG, right: Spacing.LG })
           this.settingRow('首页帖子样式', this.homeLayoutLabel(), 'settings-home-layout-row',
             SettingsSection.HomeLayout)
         }
         .width('100%')
-        .backgroundColor($r('app.color.settings_group_bg'))
+        .backgroundColor($r('app.color.settings_overview_card_bg'))
+        .borderRadius(SETTINGS_GROUP_RADIUS)
+        .clip(true)
+        Column() {
+          this.actionSettingRow('投喂开发者', '支持维护', 'settings-developer-support-row',
+            () => this.openDeveloperSupport())
+          Divider()
+            .strokeWidth(0.5)
+            .color(SemanticColors.outline())
+            .margin({ left: Spacing.LG, right: Spacing.LG })
+          this.actionSettingRow('反馈', '查看社区帖子', 'settings-feedback-row', () => this.onFeedback())
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.settings_overview_card_bg'))
         .borderRadius(SETTINGS_GROUP_RADIUS)
         .clip(true)
       }

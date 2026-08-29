@@ -78,11 +78,23 @@
     },
     {
       "name": "settings_group_bg",
+      "value": "#FF0B0F12"
+    },
+    {
+      "name": "settings_overview_card_bg",
       "value": "#FF151A20"
     },
     {
       "name": "settings_preview_bg",
       "value": "#FF20262D"
+    },
+    {
+      "name": "support_price_bg",
+      "value": "#FFFFCF32"
+    },
+    {
+      "name": "support_price_text",
+      "value": "#FF171A1F"
     },
     {
       "name": "divider",
@@ -130,19 +142,23 @@
     },
     {
       "name": "bottom_tab_bar_bg",
-      "value": "#18000000"
+      "value": "#0800B8FF"
     },
     {
-      "name": "bottom_tab_bar_frost",
-      "value": "#18000000"
+      "name": "glass_translucent_tint",
+      "value": "#0800B8FF"
+    },
+    {
+      "name": "glass_system_translucent_tint",
+      "value": "#0A000000"
     },
     {
       "name": "bottom_tab_bar_highlight",
-      "value": "#1AFFFFFF"
+      "value": "#54FFFFFF"
     },
     {
       "name": "bottom_tab_bar_shadow",
-      "value": "#66000000"
+      "value": "#50000000"
     },
     {
       "name": "brand_primary_bright",
@@ -150,19 +166,19 @@
     },
     {
       "name": "liquid_glass_bg",
-      "value": "#18000000"
+      "value": "#0A000000"
     },
     {
       "name": "liquid_glass_highlight",
-      "value": "#1AFFFFFF"
+      "value": "#52FFFFFF"
     },
     {
       "name": "liquid_segment_bg",
-      "value": "#18000000"
+      "value": "#0A000000"
     },
     {
       "name": "liquid_segment_selected",
-      "value": "#0A5B8FF9"
+      "value": "#165B8FF9"
     },
     {
       "name": "compose_forum_selected_bg",
@@ -247,6 +263,46 @@
     {
       "name": "topic_status_card_finished_soft",
       "value": "#2CAAB4BF"
+    },
+    {
+      "name": "gacha_rarity_ur",
+      "value": "#FFA855F7"
+    },
+    {
+      "name": "gacha_rarity_ur_soft",
+      "value": "#2CA855F7"
+    },
+    {
+      "name": "gacha_rarity_ssr",
+      "value": "#FFF59E0B"
+    },
+    {
+      "name": "gacha_rarity_ssr_soft",
+      "value": "#2CF59E0B"
+    },
+    {
+      "name": "gacha_rarity_sr",
+      "value": "#FF5B8FF9"
+    },
+    {
+      "name": "gacha_rarity_sr_soft",
+      "value": "#2C5B8FF9"
+    },
+    {
+      "name": "gacha_rarity_r",
+      "value": "#FFAAB4BF"
+    },
+    {
+      "name": "gacha_rarity_r_soft",
+      "value": "#2CAAB4BF"
+    },
+    {
+      "name": "gacha_rarity_n",
+      "value": "#FF8A93A3"
+    },
+    {
+      "name": "gacha_rarity_n_soft",
+      "value": "#2C8A93A3"
     }
   ]
 }

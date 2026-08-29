@@ -1,15 +1,13 @@
 import { hdsMaterial, ScrollEffectType, SystemMaterialParams } from '@kit.UIDesignKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { GlassStyle, GlassStyleMode } from './GlassStyleParams';
 
-export const HDS_TITLE_BAR_BLUR_RADIUS: number = 24;
-export const HDS_TITLE_BAR_MASK_EXTRA_HEIGHT: number = 16;
+// Keep the progressive title-bar treatment, but cap its sampling footprint on
+// API 23-24. The previous 24vp kernel was disproportionately expensive while a
+// full-width list was moving underneath it.
+export const HDS_TITLE_BAR_BLUR_RADIUS: number = 12;
+export const HDS_TITLE_BAR_MASK_EXTRA_HEIGHT: number = 8;
 export const IMMERSIVE_PANEL_BLUR_RADIUS: number = 6;
-
-export enum ImmersiveMaterialLevelPreference {
-  Adaptive = 'ADAPTIVE',
-  Exquisite = 'EXQUISITE',
-  Gentle = 'GENTLE',
-  Smooth = 'SMOOTH'
-}
 
 export enum ImmersiveLightArea {
   TITLE_BAR = 'titleBar',
@@ -18,16 +16,7 @@ export enum ImmersiveLightArea {
   INPUT_BAR = 'inputBar'
 }
 
-let preferredLevel: ImmersiveMaterialLevelPreference = ImmersiveMaterialLevelPreference.Adaptive;
 let cachedMaterialType: hdsMaterial.MaterialType | undefined = undefined;
-
-export function setImmersiveMaterialLevel(level: ImmersiveMaterialLevelPreference): void {
-  preferredLevel = level;
-}
-
-export function getImmersiveMaterialLevel(): ImmersiveMaterialLevelPreference {
-  return preferredLevel;
-}
 
 export function systemMaterialType(): hdsMaterial.MaterialType {
   if (cachedMaterialType !== undefined) {
@@ -35,14 +24,22 @@ export function systemMaterialType(): hdsMaterial.MaterialType {
   }
   try {
     const supported = hdsMaterial.getSystemMaterialTypes();
-    if (supported.indexOf(hdsMaterial.MaterialType.IMMERSIVE) >= 0) {
-      cachedMaterialType = hdsMaterial.MaterialType.IMMERSIVE;
-    } else if (supported.indexOf(hdsMaterial.MaterialType.ADAPTIVE) >= 0) {
+    hilog.info(0x0000, 'ImmersiveMaterial', 'system material types: %{public}s',
+      JSON.stringify(supported));
+    // ADAPTIVE is the spatial-UI material that samples the live content below
+    // the control. Prefer it over the fixed immersive variant so colorful feed
+    // content remains visible as the lively refracted field seen in the system
+    // gallery/app-market bars.
+    if (supported.indexOf(hdsMaterial.MaterialType.ADAPTIVE) >= 0) {
       cachedMaterialType = hdsMaterial.MaterialType.ADAPTIVE;
+    } else if (supported.indexOf(hdsMaterial.MaterialType.IMMERSIVE) >= 0) {
+      cachedMaterialType = hdsMaterial.MaterialType.IMMERSIVE;
     } else {
       cachedMaterialType = hdsMaterial.MaterialType.NONE;
     }
-  } catch (_) {
+  } catch (err) {
+    hilog.warn(0x0000, 'ImmersiveMaterial', 'getSystemMaterialTypes failed: %{public}s',
+      JSON.stringify(err));
     cachedMaterialType = hdsMaterial.MaterialType.NONE;
   }
   return cachedMaterialType;
@@ -56,20 +53,21 @@ export function hasImmersiveSystemMaterial(): boolean {
   return systemMaterialType() !== hdsMaterial.MaterialType.NONE;
 }
 
-export function adaptiveSystemMaterialEffect(): SystemMaterialParams {
+// ADAPTIVE 会按设备算力与明暗背景控制滤镜。EXQUISITE 在高亮文字密集的列表
+// 上容易把整块材质抬成灰白色，不符合 ultra-thin 参考效果。
+function adaptiveEffect(): SystemMaterialParams {
   return {
     materialType: systemMaterialType(),
-    materialLevel: resolveMaterialLevel(preferredLevel)
+    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
   };
 }
 
+export function glassAwareSystemMaterialEffect(_style: GlassStyleMode): SystemMaterialParams {
+  return adaptiveEffect();
+}
+
 export function emphasizedSystemMaterialEffect(): SystemMaterialParams {
-  const materialType = systemMaterialType();
-  return {
-    materialType: materialType,
-    materialLevel: materialType === hdsMaterial.MaterialType.IMMERSIVE ?
-      hdsMaterial.MaterialLevel.EXQUISITE : hdsMaterial.MaterialLevel.ADAPTIVE
-  };
+  return glassAwareSystemMaterialEffect(GlassStyle.currentMode());
 }
 
 export function preferredTitleBarScrollEffectType(): ScrollEffectType {
@@ -82,17 +80,4 @@ export function requiresHdsComponentSafeArea(area: ImmersiveLightArea): boolean 
 
 export function requiresHdsLayoutSafeAreaAvoidance(area: ImmersiveLightArea): boolean {
   return area === ImmersiveLightArea.TITLE_BAR;
-}
-
-function resolveMaterialLevel(level: ImmersiveMaterialLevelPreference): hdsMaterial.MaterialLevel {
-  switch (level) {
-    case ImmersiveMaterialLevelPreference.Exquisite:
-      return hdsMaterial.MaterialLevel.EXQUISITE;
-    case ImmersiveMaterialLevelPreference.Gentle:
-      return hdsMaterial.MaterialLevel.GENTLE;
-    case ImmersiveMaterialLevelPreference.Smooth:
-      return hdsMaterial.MaterialLevel.SMOOTH;
-    default:
-      return hdsMaterial.MaterialLevel.ADAPTIVE;
-  }
 }

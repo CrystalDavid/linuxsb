@@ -1,4 +1,5 @@
 import { bundleManager } from '@kit.AbilityKit';
+import { curves } from '@kit.ArkUI';
 import {
   BlurStrategy,
   HdsNavDestination,
@@ -11,6 +12,7 @@ import {
   COMPOSE_ROUTE,
   DIAGNOSTICS_ROUTE,
   isTopicRouteParam,
+  SEARCH_ROUTE,
   SETTINGS_ROUTE,
   TOPIC_ROUTE,
   TopicRouteParam
@@ -19,6 +21,7 @@ import { m1Runtime } from '../../app/M1Runtime';
 import { PageMetrics, SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import { SYS_BOTTOM_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
+import { PortalAction } from '../../models/PortalModels';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { HomePage } from './HomePage';
@@ -29,7 +32,9 @@ import { ProfilePage } from './ProfilePage';
 import { SearchPage } from './SearchPage';
 import { SettingsPage } from './SettingsPage';
 import { TopicDetailPage } from './TopicDetailPage';
+import { TitleCenterPage } from './TitleCenterPage';
 import { CommunityTab, ImmersiveBottomTabBar } from '../components/ImmersiveBottomTabBar';
+import { ImmersiveIconButton } from '../components/ImmersiveIconButton';
 
 function isDebugPackage(): boolean {
   try {
@@ -51,6 +56,8 @@ export struct RootTabPage {
   @State private loginReturnTopicId: number = 0;
   @State private ignoreTopicTapUntil: number = 0;
   @State private selectedTab: CommunityTab = CommunityTab.Home;
+  @State private dockBarOffsetX: number = 0;
+  @State private homeIconActionGeneration: number = 0;
   @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
   private tabsController: HdsTabsController = new HdsTabsController();
   private debugPackage: boolean = isDebugPackage();
@@ -66,13 +73,24 @@ export struct RootTabPage {
     }
   }
 
-  private openTopic(topic: TopicUiModel): void {
+  private openTopic(topic: TopicUiModel, focusReplyId: number = 0): void {
     if (Date.now() < this.ignoreTopicTapUntil) {
       return;
     }
     TopicOpenTrace.begin(topic.topicId);
-    this.pathStack.pushPath(new NavPathInfo(TOPIC_ROUTE, buildTopicRouteParam(topic.topicId, topic)));
+    this.pathStack.pushPath(new NavPathInfo(TOPIC_ROUTE,
+      buildTopicRouteParam(topic.topicId, topic, focusReplyId)));
     TopicOpenTrace.markRoutePush();
+  }
+
+  private openTopicLocation(topicId: number, replyId: number, title: string): void {
+    if (topicId <= 0) {
+      return;
+    }
+    const topic = new TopicUiModel();
+    topic.topicId = topicId;
+    topic.title = title.length > 0 ? title : `Topic ${topicId}`;
+    this.openTopic(topic, replyId);
   }
 
   private openDiagnostics(): void {
@@ -110,15 +128,38 @@ export struct RootTabPage {
     this.pathStack.pushPathByName(SETTINGS_ROUTE, null);
   }
 
-  private switchTab(tab: CommunityTab): void {
+  private openSearch(): void {
+    this.pathStack.pushPathByName(SEARCH_ROUTE, null);
+  }
+
+  private dockOffsetFor(tab: CommunityTab): number {
+    return tab === CommunityTab.Forums || tab === CommunityTab.Titles ?
+      PageMetrics.BOTTOM_DOCK_CENTER_OFFSET : 0;
+  }
+
+  private animateDockForTab(tab: CommunityTab): void {
+    this.getUIContext().animateTo({ curve: curves.interpolatingSpring(0, 1, 360, 34) }, () => {
+      this.dockBarOffsetX = this.dockOffsetFor(tab);
+    });
+  }
+
+  private syncSelectedTab(tab: CommunityTab): void {
     if (tab === this.selectedTab) {
       return;
     }
     this.selectedTab = tab;
-    this.tabsController.changeIndex(tab as number);
+    this.animateDockForTab(tab);
     if (tab === CommunityTab.Profile && m1Runtime.hasMemorySession()) {
       m1Runtime.verifyActiveSession();
     }
+  }
+
+  private switchTab(tab: CommunityTab): void {
+    if (tab === this.selectedTab) {
+      return;
+    }
+    this.syncSelectedTab(tab);
+    this.tabsController.changeIndex(tab as number);
   }
 
   private openCreatedTopic(topicId: number): void {
@@ -205,10 +246,14 @@ export struct RootTabPage {
           viewModel: m1Runtime.topicViewModel,
           topicId: (param as TopicRouteParam).topicId,
           summary: (param as TopicRouteParam).summary,
+          focusReplyId: (param as TopicRouteParam).focusReplyId ?? 0,
           authenticated: this.authenticated,
           onBack: () => this.pathStack.pop(),
           onLogin: () => this.requestTopicLogin(param as TopicRouteParam),
-          onReply: (body: string) => m1Runtime.reply((param as TopicRouteParam).topicId, body)
+          onReply: (body: string) => m1Runtime.reply((param as TopicRouteParam).topicId, body),
+          onUploadImage: (uri: string) => m1Runtime.uploadImage(uri),
+          onReportReply: (replyId: number, reasonType: string, details: string) =>
+            m1Runtime.reportReply(replyId, reasonType, details)
         })
       }
       .hideTitleBar(true)
@@ -230,6 +275,7 @@ export struct RootTabPage {
           onLogin: () => this.requestHomeLogin(),
           onSubmit: (forumId: number, title: string, body: string) =>
             m1Runtime.createTopic(forumId, title, body),
+          onUploadImage: (uri: string) => m1Runtime.uploadImage(uri),
           onCreated: (topicId: number) => this.openCreatedTopic(topicId)
         })
       }
@@ -237,7 +283,23 @@ export struct RootTabPage {
       .backgroundColor(SemanticColors.page())
     } else if (routeName === SETTINGS_ROUTE) {
       HdsNavDestination() {
-        SettingsPage({ onBack: () => this.pathStack.pop() })
+        SettingsPage({
+          onBack: () => this.pathStack.pop(),
+          onFeedback: () => this.openTopicLocation(17803, 0, '烧饼社区鸿蒙客户端反馈')
+        })
+      }
+      .hideTitleBar(true)
+      .backgroundColor(SemanticColors.page())
+    } else if (routeName === SEARCH_ROUTE) {
+      HdsNavDestination() {
+        SearchPage({
+          viewModel: m1Runtime.searchViewModel,
+          authenticated: this.authenticated,
+          bottomContentInset: 0,
+          onBack: () => this.pathStack.pop(),
+          onLogin: () => this.requestHomeLogin(),
+          onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+        })
       }
       .hideTitleBar(true)
       .backgroundColor(SemanticColors.page())
@@ -253,7 +315,8 @@ export struct RootTabPage {
   private immersiveMiniBar() {
     ImmersiveBottomTabBar({
       selectedTab: this.selectedTab,
-      onSelect: (tab: CommunityTab) => this.switchTab(tab)
+      onSelect: (tab: CommunityTab) => this.switchTab(tab),
+      onHomeDoubleTap: () => { this.homeIconActionGeneration++; }
     })
   }
 
@@ -269,7 +332,8 @@ export struct RootTabPage {
             onOpenDiagnostics: () => this.openDiagnostics(),
             onPrefetch: (topicIds: number[]) => m1Runtime.prefetchTopics(topicIds),
             onCancelPrefetch: () => m1Runtime.cancelPrefetch(),
-            onCompose: () => this.openComposer()
+            onSearch: () => this.openSearch(),
+            homeIconActionGeneration: this.homeIconActionGeneration
           })
         }
         .tabBar(this.hiddenTabBar())
@@ -283,11 +347,12 @@ export struct RootTabPage {
         .tabBar(this.hiddenTabBar())
 
         TabContent() {
-          SearchPage({
-            viewModel: m1Runtime.searchViewModel,
+          TitleCenterPage({
             authenticated: this.authenticated,
             onLogin: () => this.requestHomeLogin(),
-            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+            onLoad: (path: string) => m1Runtime.loadPortal(path),
+            onSubmit: (action: PortalAction, overrides?: Record<string, string | number | boolean | string[]>) =>
+              m1Runtime.submitPortalAction(action, overrides ?? {})
           })
         }
         .tabBar(this.hiddenTabBar())
@@ -299,8 +364,13 @@ export struct RootTabPage {
             authenticated: this.authenticated,
             loginGeneration: this.loginGeneration,
             onLogin: () => this.requestHomeLogin(),
-            onOpenSettings: () => this.openSettings(),
-            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic)
+            onTopicSelected: (topic: TopicUiModel) => this.openTopic(topic),
+            onOpenTopicLocation: (topicId: number, replyId: number, title: string) =>
+              this.openTopicLocation(topicId, replyId, title),
+            onLoadPortal: (path: string) => m1Runtime.loadPortal(path),
+            onSubmitPortal: (action: PortalAction) => m1Runtime.submitPortalAction(action),
+            onUploadImage: (uri: string) => m1Runtime.uploadImage(uri),
+            onUploadAvatar: (uri: string) => m1Runtime.uploadAvatar(uri)
           })
         }
         .tabBar(this.hiddenTabBar())
@@ -310,34 +380,77 @@ export struct RootTabPage {
       .barPosition(BarPosition.End)
       .vertical(false)
       .scrollable(false)
-      // HdsTabs remains the native page container, but its own visual bar is deliberately collapsed.
-      // The visible bar below is the only glass layer; rendering both produced mismatched outlines.
+      // HdsTabs remains the native page container, but its own visual bar is
+      // deliberately collapsed. The visible tray below is the only glass layer
+      // (the locked CheckBottomTabVisualLock recipe); rendering both the HDS
+      // floating material and the self-drawn glass would double-sample and
+      // muddy the smoked immersive light.
       .barWidth(1)
       .barHeight(1)
       .barBackgroundColor(Color.Transparent)
       .barBackgroundBlurStyle(BlurStyle.NONE)
+      .blurStrategy(BlurStrategy.DISABLE)
       // HdsTabs content animation cannot be customized. Keep page replacement immediate and let the
       // single native glass indicator provide the continuous cross-tab motion.
       .animationDuration(0)
-      .blurStrategy(BlurStrategy.DISABLE)
       .onSelected((index: number) => {
         if (index >= CommunityTab.Home && index <= CommunityTab.Profile) {
-          this.selectedTab = index as CommunityTab;
+          this.syncSelectedTab(index as CommunityTab);
         }
       })
       .onChange((index: number) => {
         if (index >= CommunityTab.Home && index <= CommunityTab.Profile) {
-          this.selectedTab = index as CommunityTab;
+          this.syncSelectedTab(index as CommunityTab);
         }
       })
       .width('100%')
       .height('100%')
       .backgroundColor(SemanticColors.page())
 
-      Row() {
-        this.immersiveMiniBar()
-      }
+      Stack({ alignContent: Alignment.TopStart }) {
+        Row() {
+          this.immersiveMiniBar()
+        }
         .width(PageMetrics.BOTTOM_TAB_BAR_WIDTH)
+        .height(PageMetrics.BOTTOM_TAB_BAR_HEIGHT)
+        .position({ x: 0, y: 0 })
+        .translate({ x: this.dockBarOffsetX })
+
+        if (this.selectedTab === CommunityTab.Home) {
+          Row() {
+            ImmersiveIconButton({
+              icon: $r('sys.symbol.plus'),
+              semanticId: 'home-write-fab',
+              semanticLabel: '发表新主题',
+              buttonSize: PageMetrics.BOTTOM_DOCK_ACTION_SIZE,
+              iconSize: 27,
+              iconWeight: 900,
+              iconColor: SemanticColors.textPrimary(),
+              onAction: () => this.openComposer()
+            })
+          }
+          .width(PageMetrics.BOTTOM_DOCK_ACTION_SIZE)
+          .height(PageMetrics.BOTTOM_DOCK_ACTION_SIZE)
+          .position({ x: PageMetrics.BOTTOM_TAB_BAR_WIDTH + PageMetrics.BOTTOM_DOCK_GAP, y: 0 })
+        } else if (this.selectedTab === CommunityTab.Profile) {
+          Row() {
+            ImmersiveIconButton({
+              icon: $r('sys.symbol.gearshape_fill'),
+              semanticId: 'profile-settings-dock',
+              semanticLabel: '设置',
+              buttonSize: PageMetrics.BOTTOM_DOCK_ACTION_SIZE,
+              iconSize: 27,
+              iconWeight: 500,
+              iconColor: SemanticColors.textPrimary(),
+              onAction: () => this.openSettings()
+            })
+          }
+          .width(PageMetrics.BOTTOM_DOCK_ACTION_SIZE)
+          .height(PageMetrics.BOTTOM_DOCK_ACTION_SIZE)
+          .position({ x: PageMetrics.BOTTOM_TAB_BAR_WIDTH + PageMetrics.BOTTOM_DOCK_GAP, y: 0 })
+        }
+      }
+        .width(PageMetrics.BOTTOM_DOCK_WIDTH)
         .height(PageMetrics.BOTTOM_TAB_BAR_HEIGHT)
         .margin({ bottom: PageMetrics.BOTTOM_TAB_BAR_BOTTOM_MARGIN + this.bottomInset })
         .zIndex(2)

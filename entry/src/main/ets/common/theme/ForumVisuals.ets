@@ -73,6 +73,8 @@ export class ForumVisuals {
         return '寻求社区大佬的版主专区，解决大家的各种难题！';
       case 6:
         return '关于社区发展、功能、使用问题、管理问题等相关话题';
+      case 7:
+        return '讨论人生哲学、未解之谜、科技前沿、尖端领域，探索未知领域。';
       case 8:
         return '推广帖专区，拉人，aff 都可以发这里，首页不展示。';
       case 9:

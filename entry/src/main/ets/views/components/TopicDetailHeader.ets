@@ -1,4 +1,4 @@
-import { SemanticColors, Typography } from '../../common/theme/DesignSystem';
+import { SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import { resolveTopicDetailHeaderMode, TopicDetailHeaderMode } from '../../common/ui/TopicDetailHeaderState';
 import {
   ImmersiveIconButton,
@@ -51,9 +51,11 @@ export struct TopicDetailHeader {
             .width('100%')
           if (this.categoryName.length > 0) {
             Text(this.categoryName)
+              .id('topic-header-collapsed-category')
               .fontSize(Typography.LABEL_SMALL)
               .fontColor(SemanticColors.textSecondary())
               .maxLines(1)
+              .margin({ left: Spacing.MD })
           }
         }
         .id('topic-header-collapsed-title')

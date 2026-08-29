@@ -11,7 +11,7 @@ import { SYS_BOTTOM_INSET_KEY, SYS_TOP_INSET_KEY } from '../../common/ui/Immersi
 import { PostUiModel, ReplyUiModel, TopicDetailUiModel, TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { ReplyAccess } from '../../models/TopicModels';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
-import { WriteResult } from '../../services/repository/WriteRepository';
+import { AttachmentUploadResult, WriteResult } from '../../services/repository/WriteRepository';
 import { TopicDetailViewModel } from '../../viewmodels/TopicDetailViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { CommentInputBar } from '../components/CommentInputBar';
@@ -26,11 +26,16 @@ export struct TopicDetailPage {
   @ObjectLink viewModel: TopicDetailViewModel;
   topicId: number = 0;
   summary: TopicUiModel | undefined = undefined;
+  focusReplyId: number = 0;
   @Prop authenticated: boolean = false;
   onBack: () => void = () => {};
   onLogin: () => void = () => {};
   onReply: (body: string) => Promise<WriteResult> =
     async () => ({ ok: false, topicId: 0, message: '回复服务不可用', networkMs: 0 });
+  onUploadImage: (uri: string) => Promise<AttachmentUploadResult> =
+    async () => ({ ok: false, markdown: '', message: '上传服务不可用', networkMs: 0 });
+  onReportReply: (replyId: number, reasonType: string, details: string) => Promise<WriteResult> =
+    async () => ({ ok: false, topicId: 0, message: '举报服务不可用', networkMs: 0 });
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
   @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
   @State private summaryVisible: boolean = true;
@@ -40,9 +45,24 @@ export struct TopicDetailPage {
   aboutToAppear(): void {
     TopicOpenTrace.markDestinationAppear();
     this.summaryVisible = true;
-    if (this.topicId > 0) {
-      this.viewModel.open(this.topicId, this.summary);
+    this.openAndFocus();
+  }
+
+  private async openAndFocus(): Promise<void> {
+    if (this.topicId <= 0) {
+      return;
     }
+    await this.viewModel.open(this.topicId, this.summary);
+    if (this.focusReplyId <= 0) {
+      return;
+    }
+    const replyIndex = await this.viewModel.ensureReplyVisible(this.focusReplyId);
+    if (replyIndex < 0) {
+      return;
+    }
+    setTimeout(() => {
+      this.scroller.scrollToIndex(replyIndex + 4, true, ScrollAlign.START);
+    }, 80);
   }
 
   private displayTitle(): string {
@@ -65,6 +85,47 @@ export struct TopicDetailPage {
     this.replyDraft = name.length > 0 ? `@${name} #${post.floor} ` : `#${post.floor} `;
     try {
       focusControl.requestFocus('topic-reply-input');
+    } catch (_) {}
+  }
+
+  private requestReport(post: PostUiModel): void {
+    if (!this.authenticated) {
+      this.onLogin();
+      return;
+    }
+    ActionSheet.show({
+      title: `举报 #${post.floor} 回复`,
+      message: '请选择举报原因。提交后 linux.sb 会暂时冻结 500 积分作为举报押金。',
+      sheets: [
+        { title: '广告或推广', action: () => this.confirmReport(post, 'advertising', '广告或推广') },
+        { title: '辱骂或骚扰', action: () => this.confirmReport(post, 'abuse', '辱骂或骚扰') },
+        { title: '违法内容', action: () => this.confirmReport(post, 'illegal', '违法内容') },
+        { title: '成人内容', action: () => this.confirmReport(post, 'adult', '成人内容') },
+        { title: '虚假信息', action: () => this.confirmReport(post, 'misinformation', '虚假信息') },
+        { title: '隐私泄露', action: () => this.confirmReport(post, 'privacy', '隐私泄露') },
+        { title: '垃圾信息', action: () => this.confirmReport(post, 'spam', '垃圾信息') },
+        { title: '侵犯版权', action: () => this.confirmReport(post, 'copyright', '侵犯版权') }
+      ]
+    });
+  }
+
+  private confirmReport(post: PostUiModel, reasonType: string, reasonLabel: string): void {
+    AlertDialog.show({
+      title: '确认举报',
+      message: `原因：${reasonLabel}\n\n这会真实提交到 linux.sb。举报成立会退还 500 积分押金，误报可能扣除押金。`,
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '确认举报',
+        fontColor: Color.Red,
+        action: () => { this.submitReport(post.postId, reasonType); }
+      }
+    });
+  }
+
+  private async submitReport(replyId: number, reasonType: string): Promise<void> {
+    const result = await this.onReportReply(replyId, reasonType, '');
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: result.message, duration: 2200 });
     } catch (_) {}
   }
 
@@ -178,7 +239,8 @@ export struct TopicDetailPage {
             TopicPostItem({
               post: reply,
               mainPost: false,
-              onReply: (post: PostUiModel) => this.requestReplyTo(post)
+              onReply: (post: PostUiModel) => this.requestReplyTo(post),
+              onReport: (post: PostUiModel) => this.requestReport(post)
             })
           }
         }, (reply: ReplyUiModel) => reply.postId.toString())
@@ -304,6 +366,7 @@ export struct TopicDetailPage {
         authenticated: this.authenticated,
         onLogin: () => this.onLogin(),
         onSubmit: (body: string) => this.submitReply(body),
+        onUploadImage: (uri: string) => this.onUploadImage(uri),
         onSubmitted: () => this.handleReplySubmitted()
       })
     }

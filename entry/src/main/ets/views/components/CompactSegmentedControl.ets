@@ -2,10 +2,12 @@ import { curves } from '@kit.ArkUI';
 import { Radius, SemanticColors, Typography } from '../../common/theme/DesignSystem';
 import {
   buildImmersiveGlassEffect,
+  buildImmersiveSystemMaterialModifier,
   IMMERSIVE_GLASS_BORDER_WIDTH,
   IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
   IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
+import { GLASS_STYLE_STORAGE_KEY, GlassStyleMode } from '../../common/ui/GlassStyleParams';
 
 export class SegmentOption {
   label: string;
@@ -31,6 +33,7 @@ export struct CompactSegmentedControl {
   @Prop labelOffsetY: number = 0;
   semanticId: string = 'compact-segmented-control';
   onSelect: (index: number) => void = () => {};
+  @StorageProp(GLASS_STYLE_STORAGE_KEY) private glassStyle: GlassStyleMode = GlassStyleMode.Translucent;
   @State private visualSelectedIndex: number = 0;
   @State private indicatorX: number = 2;
   @State private indicatorScaleX: number = 1;
@@ -204,7 +207,7 @@ export struct CompactSegmentedControl {
     .width(this.segmentWidth * this.options.length + 4)
     .height(this.controlHeight)
     .backgroundColor(Color.Transparent)
-    .backgroundEffect(buildImmersiveGlassEffect())
+    .backgroundEffect(buildImmersiveGlassEffect(this.glassStyle))
     .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH, color: $r('app.color.bottom_tab_bar_highlight') })
     .borderRadius(Radius.PILL)
     .clip(true)
@@ -213,6 +216,7 @@ export struct CompactSegmentedControl {
       color: $r('app.color.bottom_tab_bar_shadow'),
       offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
     })
+    .attributeModifier(buildImmersiveSystemMaterialModifier(this.glassStyle))
     .priorityGesture(
       PanGesture({ direction: PanDirection.Horizontal, distance: 6 })
         .onActionStart(() => this.beginIndicatorDrag())

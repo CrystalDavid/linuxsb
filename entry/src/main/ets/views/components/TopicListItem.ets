@@ -11,7 +11,6 @@ import {
   TopicListLayoutVariant
 } from '../../common/theme/TopicListStylePrefs';
 import { SemanticColors, Spacing } from '../../common/theme/DesignSystem';
-import { RelativeTime } from '../../common/utils/RelativeTime';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { TopicMetadataBadges } from './TopicBadges';
 import { UserAvatar } from './UserAvatar';
@@ -24,46 +23,34 @@ export struct TopicListItem {
   semanticId: string = '';
   @Prop layoutVariant: TopicListLayoutVariant = TopicListLayoutVariant.LegacyCompact;
   emphasizeTitle: boolean = false;
+  avatarSizeOverride: number = 0;
+  metadataGapOverride: number = 0;
 
   private authorName(): string {
     return this.topic.author.displayName.length > 0 ? this.topic.author.displayName : '社区用户';
   }
 
   private authorAndReplies(): string {
-    const parts: string[] = [];
-    if (this.topic.author.displayName.length > 0) {
-      parts.push(this.topic.author.displayName);
-    }
-    if (this.topic.replyCount >= 0) {
-      parts.push(`${this.topic.replyCount} 回复`);
-    }
-    return parts.join(' · ');
+    return this.topic.authorAndRepliesLabel;
   }
 
   private replyLabel(): string {
-    return this.topic.replyCount >= 0 ? `${this.topic.replyCount} 回复` : '';
+    return this.topic.replyCountLabel;
   }
 
   private activityTimeLabel(): string {
-    return this.topic.lastReplyAt > 0 ? RelativeTime.fromEpochSeconds(this.topic.lastReplyAt) : '';
+    return this.topic.activityTimeLabel;
   }
 
   private headerActivityLabel(): string {
-    const parts: string[] = [];
-    if (this.activityTimeLabel().length > 0) {
-      parts.push(this.activityTimeLabel());
-    }
-    if (this.replyLabel().length > 0) {
-      parts.push(this.replyLabel());
-    }
-    return parts.join(' · ');
+    return this.topic.headerActivityLabel;
   }
 
   private dividerInset(): number {
     if (this.layoutVariant === TopicListLayoutVariant.AuthorHeader) {
       return this.contentHorizontalPadding;
     }
-    return this.contentHorizontalPadding + AVATAR_SIZE_DEFAULT + avatarGap(AVATAR_SIZE_DEFAULT);
+    return this.contentHorizontalPadding + this.topicAvatarSize() + avatarGap(this.topicAvatarSize());
   }
 
   private topicTitleSize(): number {
@@ -78,10 +65,16 @@ export struct TopicListItem {
   }
 
   private topicAvatarSize(): number {
+    if (this.avatarSizeOverride > 0) {
+      return this.avatarSizeOverride;
+    }
     return this.layoutVariant === TopicListLayoutVariant.AuthorHeader ? 38 : AVATAR_SIZE_DEFAULT;
   }
 
   private currentMetadataGap(): number {
+    if (this.metadataGapOverride > 0) {
+      return this.metadataGapOverride;
+    }
     return this.layoutVariant === TopicListLayoutVariant.CurrentWithExpandedGap ?
       Spacing.SM : metaRowGap(ROW_PADDING_DEFAULT);
   }
@@ -142,7 +135,7 @@ export struct TopicListItem {
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
-      .margin({ left: avatarGap(AVATAR_SIZE_DEFAULT) })
+      .margin({ left: avatarGap(this.topicAvatarSize()) })
     }
     .width('100%')
     .padding({
@@ -196,7 +189,7 @@ export struct TopicListItem {
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
-      .margin({ left: avatarGap(AVATAR_SIZE_DEFAULT) })
+      .margin({ left: avatarGap(this.topicAvatarSize()) })
     }
     .width('100%')
     .padding({

@@ -43,6 +43,14 @@ export class ForumFormFields {
   title?: string;
   body?: string;
   topic_id?: number;
+  extra?: Record<string, string | number | boolean | string[]>;
+}
+
+export interface TransportUploadFile {
+  fileName: string;
+  contentType: string;
+  path: string;
+  fieldName?: string;
 }
 
 export enum TransportCachePolicy {
@@ -63,7 +71,10 @@ export interface ForumTransport {
   getAuthenticatedTopicPage?(topicId: number, pageUrl: string, cookieHeader: string,
     cachePolicy?: TransportCachePolicy, allowConditional?: boolean): Promise<TransportProbeResponse>;
   getAuthenticatedNotifications(cookieHeader: string): Promise<TransportProbeResponse>;
+  getAuthenticatedPage?(pageUrl: string, cookieHeader: string): Promise<TransportProbeResponse>;
   postForm?(pageUrl: string, fields: ForumFormFields,
+    cookieHeader: string): Promise<TransportProbeResponse>;
+  postMultipartFile?(pageUrl: string, fields: ForumFormFields, file: TransportUploadFile,
     cookieHeader: string): Promise<TransportProbeResponse>;
   cancelAll(): void;
   close(): void;

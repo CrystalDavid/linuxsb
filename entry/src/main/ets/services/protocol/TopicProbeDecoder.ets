@@ -91,7 +91,21 @@ export class TopicProbeDecoder {
           loginVisibleMarkerCount++;
         }
 
-        if (token.name === 'li' && hasClass(token.attributes, 'post-entry') && currentPost === undefined) {
+        if (token.name === 'li' && hasClass(token.attributes, 'post-entry')) {
+          // HTML permits an opening <li> to implicitly close the previous item.
+          // The BBS occasionally emits exactly that shape on real-device
+          // responses. Treat every post-entry start as an authoritative sibling
+          // boundary so one malformed reply can never swallow all later floors.
+          if (currentPost !== undefined) {
+            this.finalizePost(currentPost, replies, replyIds, warnings, mainPostId);
+            currentPost = undefined;
+            authorDepth = 0;
+            authorText = '';
+            contentDepth = 0;
+            contentText = '';
+            floorDepth = 0;
+            floorText = '';
+          }
           currentPost = new PostDraft();
           postListItemDepth = 1;
           currentPost.postId = parsePrefixedId(token.attributes.get('id') ?? '', 'post-');
@@ -204,7 +218,7 @@ export class TopicProbeDecoder {
       if (contentDepth > 0 && token.name === 'div') {
         contentDepth--;
         if (contentDepth === 0 && currentPost !== undefined) {
-          currentPost.bodyText = collapseWhitespace(contentText);
+          currentPost.bodyText = this.sanitizeBodyText(collapseWhitespace(contentText));
         }
       }
       if (token.name === 'li' && currentPost !== undefined) {
@@ -292,6 +306,10 @@ export class TopicProbeDecoder {
   private isVoidTag(name: string): boolean {
     return name === 'br' || name === 'img' || name === 'hr' || name === 'input' || name === 'meta' ||
       name === 'link' || name === 'source' || name === 'track' || name === 'wbr';
+  }
+
+  private sanitizeBodyText(value: string): string {
+    return collapseWhitespace(value.split('展开全文').join('').split('收起全文').join(''));
   }
 
   private finalizePost(post: PostDraft | undefined, replies: ReplyProbeSummary[], replyIds: Set<number>, warnings: string[], mainPostId: number): void {

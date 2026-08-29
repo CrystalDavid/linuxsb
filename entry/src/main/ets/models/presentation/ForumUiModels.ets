@@ -21,6 +21,10 @@ export class TopicUiModel {
   replyCount: number = -1;
   lastReplyUser: string = '';
   lastReplyAt: number = 0;
+  activityTimeLabel: string = '';
+  replyCountLabel: string = '';
+  authorAndRepliesLabel: string = '';
+  headerActivityLabel: string = '';
   isPinned: boolean = false;
   isFeatured: boolean = false;
   isHot: boolean = false;

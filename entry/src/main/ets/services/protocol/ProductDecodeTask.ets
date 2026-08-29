@@ -7,6 +7,7 @@ import {
   HomeProtocolTopic,
   HomeProtocolUser,
   ProductDecodePort,
+  ProtocolPostDocument,
   TopicProductDecodeResult,
   TopicProtocolDocument,
   TopicProtocolReply
@@ -95,16 +96,48 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
   const structure = new TopicStructureProbe().scan(html);
   const posts = new TopicContentDecoder().decode(html);
   const replies: TopicProtocolReply[] = [];
+  const replyIds = new Set<number>();
   for (let index = 0; index < topic.replies.length; index++) {
     const item = topic.replies[index];
+    let matchingPost: ProtocolPostDocument | undefined = undefined;
+    for (let postIndex = 0; postIndex < posts.length; postIndex++) {
+      if (posts[postIndex].postId === item.replyId) {
+        matchingPost = posts[postIndex];
+        break;
+      }
+    }
     replies.push({
       replyId: item.replyId,
       floor: item.floor,
-      parentFloor: item.parentFloor,
-      author: item.author,
+      parentFloor: (item.parentFloor ?? 0) > 0 ? item.parentFloor : matchingPost?.parentFloor,
+      author: item.author.length > 0 ? item.author : (matchingPost?.author ?? ''),
       bodyText: item.bodyText
     });
+    replyIds.add(item.replyId);
   }
+  // The content decoder has independent post boundaries and can recover a row
+  // that the compact structural probe rejected. Merge those rows instead of
+  // letting one decoder silently erase valid replies and their avatars.
+  for (let postIndex = 0; postIndex < posts.length; postIndex++) {
+    const post = posts[postIndex];
+    if (post.postId <= 0 || post.postId === topic.mainPostId || replyIds.has(post.postId)) {
+      continue;
+    }
+    replies.push({
+      replyId: post.postId,
+      floor: post.floor,
+      parentFloor: post.parentFloor,
+      author: post.author,
+      bodyText: ''
+    });
+    replyIds.add(post.postId);
+  }
+  replies.sort((left: TopicProtocolReply, right: TopicProtocolReply) => {
+    if (left.floor > 0 && right.floor > 0 && left.floor !== right.floor) {
+      return left.floor - right.floor;
+    }
+    return left.replyId - right.replyId;
+  });
   const wire: ProductDecodeWireResult = {
     kind: 'topic',
     parseMs: Date.now() - startedAt,
@@ -121,7 +154,7 @@ export function executeProductDecode(kind: 'home' | 'topic', html: string, input
       posts: posts,
       loginVisibleMarkerCount: structure.loginVisibleMarkerCount,
       currentPage: topic.currentPage,
-      pageReplyCount: topic.pageReplyCount,
+      pageReplyCount: replies.length,
       totalPages: topic.totalPages,
       nextPageUrl: topic.nextPageUrl,
       warnings: topic.warnings

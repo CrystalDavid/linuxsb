@@ -43,7 +43,11 @@ export enum FeedScope {
 
 export enum FeedSort {
   NewComments = 'comment',
-  NewTopics = 'post'
+  NewTopics = 'post',
+  Featured = 'featured',
+  Lottery = 'lucky',
+  Card = 'card',
+  Footprint = 'footprint'
 }
 
 export enum FeedSearchField {

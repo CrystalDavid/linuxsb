@@ -1,13 +1,16 @@
 import { curves } from '@kit.ArkUI';
 import { PageMetrics, Radius, Typography } from '../../common/theme/DesignSystem';
 import {
-  buildImmersiveGlassEffect
+  BOTTOM_TAB_GLASS_BORDER_WIDTH,
+  BOTTOM_TAB_GLASS_SHADOW_OFFSET_Y,
+  BOTTOM_TAB_GLASS_SHADOW_RADIUS,
+  buildBottomTabGlassEffect
 } from '../../common/ui/ImmersiveActionBarStyle';
 
 export enum CommunityTab {
   Home = 0,
   Forums = 1,
-  Search = 2,
+  Titles = 2,
   Profile = 3
 }
 
@@ -37,6 +40,7 @@ export function scaleHomeTabIconPath(scale: number): string {
 export struct ImmersiveBottomTabBar {
   @Prop @Watch('onSelectedTabChanged') selectedTab: CommunityTab = CommunityTab.Home;
   onSelect: (tab: CommunityTab) => void = () => {};
+  onHomeDoubleTap: () => void = () => {};
   @State private visualSelectedTab: CommunityTab = CommunityTab.Home;
   @State private indicatorX: number = 5;
   @State private indicatorScaleX: number = 1;
@@ -165,8 +169,8 @@ export struct ImmersiveBottomTabBar {
     if (tab === CommunityTab.Forums) {
       return $r('sys.symbol.folder_fill');
     }
-    if (tab === CommunityTab.Search) {
-      return $r('sys.symbol.doc_text_magnifyingglass_fill');
+    if (tab === CommunityTab.Titles) {
+      return $r('sys.symbol.star_rosette_fill');
     }
     return $r('sys.symbol.person_fill');
   }
@@ -178,8 +182,8 @@ export struct ImmersiveBottomTabBar {
     if (tab === CommunityTab.Forums) {
       return '板块';
     }
-    if (tab === CommunityTab.Search) {
-      return '搜索';
+    if (tab === CommunityTab.Titles) {
+      return '称号';
     }
     return '我的';
   }
@@ -188,7 +192,7 @@ export struct ImmersiveBottomTabBar {
     if (tab === CommunityTab.Forums) {
       return 0.90;
     }
-    if (tab === CommunityTab.Search) {
+    if (tab === CommunityTab.Titles) {
       return 1.01;
     }
     return 1.10;
@@ -198,7 +202,7 @@ export struct ImmersiveBottomTabBar {
     if (tab === CommunityTab.Forums) {
       return 1.12;
     }
-    if (tab === CommunityTab.Search) {
+    if (tab === CommunityTab.Titles) {
       return 0.875;
     }
     return 0.955;
@@ -208,14 +212,14 @@ export struct ImmersiveBottomTabBar {
     if (tab === CommunityTab.Forums) {
       return 340;
     }
-    if (tab === CommunityTab.Search) {
+    if (tab === CommunityTab.Titles) {
       return 460;
     }
     return 320;
   }
 
   private nativeTranslateX(tab: CommunityTab): number {
-    return tab === CommunityTab.Search ? -1.5 : -0.5;
+    return tab === CommunityTab.Titles ? -1.5 : -0.5;
   }
 
   private nativeTranslateY(tab: CommunityTab): number {
@@ -294,6 +298,14 @@ export struct ImmersiveBottomTabBar {
     .backgroundColor(Color.Transparent)
     .hoverEffect(HoverEffect.None)
     .onClick(() => this.selectTab(tab))
+    .parallelGesture(
+      TapGesture({ count: 2 })
+        .onAction(() => {
+          if (tab === CommunityTab.Home) {
+            this.onHomeDoubleTap();
+          }
+        })
+    )
   }
 
   @Builder
@@ -318,7 +330,7 @@ export struct ImmersiveBottomTabBar {
       Row({ space: 0 }) {
         this.tabItem(CommunityTab.Home, '首页')
         this.tabItem(CommunityTab.Forums, '板块')
-        this.tabItem(CommunityTab.Search, '搜索')
+        this.tabItem(CommunityTab.Titles, '称号')
         this.tabItem(CommunityTab.Profile, '我的')
       }
       .width('100%')
@@ -330,15 +342,19 @@ export struct ImmersiveBottomTabBar {
     .height(PageMetrics.BOTTOM_TAB_BAR_HEIGHT)
     .clip(false)
     .backgroundColor(Color.Transparent)
-    // One sampling layer, one moving capsule, and a bright edge with a single
-    // neutral shadow. The bar is the hero glass surface: a deeper 24vp frost with
-    // a brightness lift melts scrolling content into the soft luminous field the
-    // reference floating bars show, while small controls keep the shared 6vp glass.
-    .backgroundEffect(buildImmersiveGlassEffect(24, 1.15, $r('app.color.bottom_tab_bar_frost'), 1.35))
-    .borderWidth(1.25)
+    // One sampling layer, one moving capsule, and one bright rim. API 24 uses
+    // the same 4vp / 1.42 / 0.98 optical recipe as every other glass control;
+    // the low-alpha tint preserves the live colour field instead of laying a
+    // white plate above the feed.
+    .backgroundEffect(buildBottomTabGlassEffect())
+    .borderWidth(BOTTOM_TAB_GLASS_BORDER_WIDTH)
     .borderColor($r('app.color.bottom_tab_bar_highlight'))
     .borderRadius(Radius.PILL)
-    .shadow({ radius: 16, color: $r('app.color.bottom_tab_bar_shadow'), offsetY: 4 })
+    .shadow({
+      radius: BOTTOM_TAB_GLASS_SHADOW_RADIUS,
+      color: $r('app.color.bottom_tab_bar_shadow'),
+      offsetY: BOTTOM_TAB_GLASS_SHADOW_OFFSET_Y
+    })
     .priorityGesture(
       PanGesture({ direction: PanDirection.Horizontal, distance: 6 })
         .onActionStart(() => this.beginIndicatorDrag())

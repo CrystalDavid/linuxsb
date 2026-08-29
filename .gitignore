@@ -28,6 +28,10 @@ Thumbs.db
 
 # Local device evidence and anonymous protocol snapshots
 /artifacts/
+/.cache/
+/.codex-artifacts/
+/.workbuddy/
+/.workbuddy-ai/
 
 # Signing material must never enter source control
 *.p12

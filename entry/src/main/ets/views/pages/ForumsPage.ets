@@ -11,13 +11,7 @@ import { FeedSort, ForumSummary, HomeFeedRequest } from '../../models/HomeModels
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
-import {
-  CompactSegmentedControl,
-  SegmentOption,
-  TITLE_BAR_SEGMENT_HEIGHT,
-  TITLE_BAR_SEGMENT_LABEL_SIZE,
-  TITLE_BAR_SEGMENT_WIDTH
-} from '../components/CompactSegmentedControl';
+import { FeedFilterButton, FeedFilterMenu, feedSortLabel } from '../components/FeedFilter';
 import {
   ImmersiveIconButton,
   TITLE_BAR_BACK_ICON_SIZE,
@@ -33,6 +27,8 @@ export struct ForumsPage {
   @State private selectedForumId: number = 0;
   @State private selectedSort: FeedSort = FeedSort.NewComments;
   @State private forums: ForumSummary[] = [];
+  @State private showQuickMenu: boolean = false;
+  @State private contentWidth: number = 0;
 
   aboutToAppear(): void {
     if (this.viewModel.state === ViewLoadState.Idle) {
@@ -62,6 +58,7 @@ export struct ForumsPage {
     if (forumId <= 0 || (forumId === this.selectedForumId && this.viewModel.state !== ViewLoadState.Idle)) {
       return;
     }
+    this.showQuickMenu = false;
     this.selectedForumId = forumId;
     this.viewModel.configure(HomeFeedRequest.forum(forumId, this.selectedSort));
     // Navigation must complete before the board request. Keeping the click
@@ -71,10 +68,12 @@ export struct ForumsPage {
   }
 
   private showForumDirectory(): void {
+    this.showQuickMenu = false;
     this.selectedForumId = 0;
   }
 
   private async changeSort(sort: FeedSort): Promise<void> {
+    this.showQuickMenu = false;
     if (this.selectedSort === sort) {
       return;
     }
@@ -86,13 +85,6 @@ export struct ForumsPage {
 
   private selectedForumName(): string {
     return this.forums.find((forum: ForumSummary) => forum.forumId === this.selectedForumId)?.name ?? '板块';
-  }
-
-  private sortOptions(): SegmentOption[] {
-    return [
-      new SegmentOption('新评论', 'forums-sort-comments'),
-      new SegmentOption('新帖子', 'forums-sort-topics')
-    ];
   }
 
   @Builder
@@ -123,14 +115,10 @@ export struct ForumsPage {
 
         if ((forum.topicCount ?? -1) >= 0) {
           Text((forum.topicCount ?? 0).toString())
-            .fontSize(Typography.CAPTION)
+            .fontSize(Typography.METADATA)
             .fontColor(SemanticColors.textTertiary())
             .maxLines(1)
         }
-
-        SymbolGlyph($r('sys.symbol.chevron_right'))
-          .fontSize(15)
-          .fontColor([SemanticColors.textTertiary()])
       }
       .id(first ? 'forum-first-row' : `forum-${forum.forumId}`)
       .accessibilityText(`${forum.name}板块${(forum.topicCount ?? -1) >= 0 ? `，${forum.topicCount}个主题` : ''}`)
@@ -163,28 +151,32 @@ export struct ForumsPage {
       }
       Text(this.selectedForumId > 0 ? this.selectedForumName() : '板块')
         .id('forums-page-title')
-        .fontSize(Typography.PAGE_TITLE)
+        .fontSize(this.selectedForumId > 0 ? Typography.PAGE_TITLE : Typography.ROOT_PAGE_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(SemanticColors.textPrimary())
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
       if (this.selectedForumId > 0) {
-        CompactSegmentedControl({
-          options: this.sortOptions(),
-          selectedIndex: this.selectedSort === FeedSort.NewComments ? 0 : 1,
-          segmentWidth: TITLE_BAR_SEGMENT_WIDTH,
-          controlHeight: TITLE_BAR_SEGMENT_HEIGHT,
-          labelFontSize: TITLE_BAR_SEGMENT_LABEL_SIZE,
-          semanticId: 'forums-sort-control',
-          onSelect: (index: number) => this.changeSort(index === 0 ? FeedSort.NewComments : FeedSort.NewTopics)
+        FeedFilterButton({
+          label: feedSortLabel(this.selectedSort),
+          semanticId: 'forums-sort-filter',
+          onAction: () => { this.showQuickMenu = !this.showQuickMenu; }
         })
-          .translate({ y: -2 })
       }
     }
     .width('100%').height('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD })
     .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  private quickFeedMenu() {
+    FeedFilterMenu({
+      selectedSort: this.selectedSort,
+      semanticPrefix: 'forums',
+      onSelect: (sort: FeedSort) => this.changeSort(sort)
+    })
   }
 
   @Builder
@@ -198,8 +190,8 @@ export struct ForumsPage {
       }
       .id('forum-directory')
       .width('100%')
-      .height(`calc(100% + ${Spacing.MD}vp)`)
-      .position({ x: 0, y: -Spacing.MD })
+      .height('100%')
+      .clip(true)
       .scrollBar(BarState.Off)
     } else if (this.viewModel.state === ViewLoadState.Loading || this.viewModel.state === ViewLoadState.Idle) {
       Column({ space: Spacing.SM }) {
@@ -236,16 +228,31 @@ export struct ForumsPage {
 
   build() {
     HdsNavigation() {
-      Column() {
-        if (this.selectedForumId === 0) {
-          this.forumDirectory()
-        } else {
-          this.forumTopics()
+      Stack() {
+        Column() {
+          if (this.selectedForumId === 0) {
+            this.forumDirectory()
+          } else {
+            this.forumTopics()
+          }
+        }
+        .id('forums-page')
+        .width('100%').height('100%')
+        .backgroundColor(SemanticColors.page())
+
+        if (this.showQuickMenu && this.selectedForumId > 0) {
+          Row() {
+            this.quickFeedMenu()
+          }
+            .width(148)
+            .position({ x: Math.max(0, this.contentWidth - 164), y: Spacing.SM })
+            .zIndex(8)
         }
       }
-      .id('forums-page')
       .width('100%').height('100%')
-      .backgroundColor(SemanticColors.page())
+      .onAreaChange((_oldArea: Area, newArea: Area) => {
+        this.contentWidth = Number(newArea.width);
+      })
     }
     .titleBar({
       avoidLayoutSafeArea: requiresHdsLayoutSafeAreaAvoidance(ImmersiveLightArea.TITLE_BAR),

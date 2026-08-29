@@ -2,10 +2,12 @@ import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { PageMetrics, Radius, SemanticColors, Spacing, Typography } from '../../common/theme/DesignSystem';
 import {
   buildImmersiveGlassEffect,
+  buildImmersiveSystemMaterialModifier,
   IMMERSIVE_GLASS_BORDER_WIDTH,
   IMMERSIVE_GLASS_SHADOW_OFFSET_Y,
   IMMERSIVE_GLASS_SHADOW_RADIUS
 } from '../../common/ui/ImmersiveActionBarStyle';
+import { GLASS_STYLE_STORAGE_KEY, GlassStyleMode } from '../../common/ui/GlassStyleParams';
 import { buildImmersiveTitleBarStyle } from '../../common/ui/ImmersiveTitleBarStyle';
 import {
   ImmersiveLightArea,
@@ -17,29 +19,32 @@ import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { HomeViewModel } from '../../viewmodels/HomeViewModel';
 import { ViewLoadState } from '../../viewmodels/ViewState';
 import { AccountLoginGate } from '../components/AccountLoginGate';
-import { CompactSegmentedControl, SegmentOption } from '../components/CompactSegmentedControl';
 import {
-  GLASS_ACTION_ARROW_ICON_SIZE,
   GLASS_ACTION_ARROW_ICON_WEIGHT,
-  ImmersiveIconButton
+  ImmersiveIconButton,
+  TITLE_BAR_BACK_ICON_SIZE,
+  TITLE_BAR_BACK_ICON_WEIGHT
 } from '../components/ImmersiveIconButton';
 import { PaginatedTopicList } from '../components/PaginatedTopicList';
 
-const SEARCH_FIELD_SEGMENT_WIDTH: number = 52;
-const SEARCH_FIELD_CONTROL_HEIGHT: number = 32;
 const SEARCH_PRIMARY_CONTROL_HEIGHT: number = 42;
+const SEARCH_SEND_ICON_SIZE: number = 20;
 const SEARCH_EMPTY_HINT_LIFT: number = 100;
+const SEARCH_FIELD_MENU_HEIGHT: number = 134;
 
 @Component({ freezeWhenInactive: true })
 export struct SearchPage {
   @ObjectLink viewModel: HomeViewModel;
   @Prop authenticated: boolean = false;
   bottomContentInset: number = PageMetrics.BOTTOM_TAB_BAR_CONTENT_INSET;
+  onBack: () => void = () => {};
   onLogin: () => void = () => {};
   onTopicSelected: (topic: TopicUiModel) => void = () => {};
   @State private query: string = '';
   @State private field: FeedSearchField = FeedSearchField.Title;
   @State private hasSearched: boolean = false;
+  @State private showFieldMenu: boolean = false;
+  @StorageProp(GLASS_STYLE_STORAGE_KEY) private glassStyle: GlassStyleMode = GlassStyleMode.Translucent;
 
   private async search(): Promise<void> {
     const normalized = this.query.trim();
@@ -53,6 +58,7 @@ export struct SearchPage {
       } catch (_) {}
       return;
     }
+    this.showFieldMenu = false;
     this.hasSearched = true;
     this.viewModel.configure(HomeFeedRequest.search(normalized, this.field));
     await this.viewModel.load(false);
@@ -60,7 +66,15 @@ export struct SearchPage {
 
   @Builder
   private titleBar() {
-    Row() {
+    Row({ space: Spacing.SM }) {
+      ImmersiveIconButton({
+        icon: $r('sys.symbol.chevron_left'),
+        semanticId: 'search-back',
+        semanticLabel: '返回',
+        iconSize: TITLE_BAR_BACK_ICON_SIZE,
+        iconWeight: TITLE_BAR_BACK_ICON_WEIGHT,
+        onAction: () => this.onBack()
+      })
       Text('搜索')
         .id('search-page-title')
         .fontSize(Typography.PAGE_TITLE)
@@ -72,33 +86,97 @@ export struct SearchPage {
     .alignItems(VerticalAlign.Center)
   }
 
-  private fieldOptions(): SegmentOption[] {
-    return [
-      new SegmentOption('标题', 'search-field-title'),
-      new SegmentOption('正文', 'search-field-body'),
-      new SegmentOption('回帖', 'search-field-reply')
-    ];
-  }
-
-  private fieldIndex(): number {
+  private fieldLabel(): string {
     if (this.field === FeedSearchField.Body) {
-      return 1;
+      return '正文';
     }
-    return this.field === FeedSearchField.Reply ? 2 : 0;
+    return this.field === FeedSearchField.Reply ? '回帖' : '标题';
   }
 
-  private selectField(index: number): void {
-    this.field = index === 1 ? FeedSearchField.Body : (index === 2 ? FeedSearchField.Reply : FeedSearchField.Title);
+  private chooseField(): void {
+    this.showFieldMenu = !this.showFieldMenu;
+  }
+
+  @Builder
+  private fieldMenuItem(label: string, field: FeedSearchField, semanticId: string) {
+    Button({ type: ButtonType.Normal, stateEffect: false }) {
+      Row() {
+        Text(label)
+          .fontSize(Typography.BODY)
+          .fontColor(SemanticColors.textPrimary())
+          .fontWeight(this.field === field ? FontWeight.Medium : FontWeight.Regular)
+        Blank()
+        if (this.field === field) {
+          SymbolGlyph($r('sys.symbol.checkmark'))
+            .fontSize(15)
+            .fontColor([SemanticColors.textPrimary()])
+        }
+      }
+      .width('100%')
+    }
+    .id(semanticId)
+    .width(132)
+    .height(42)
+    .padding({ left: Spacing.MD, right: Spacing.MD })
+    .backgroundColor(Color.Transparent)
+    .borderRadius(Radius.MD)
+    .hoverEffect(HoverEffect.None)
+    .onClick(() => {
+      this.field = field;
+      this.showFieldMenu = false;
+    })
+  }
+
+  @Builder
+  private fieldMenu() {
+    Column() {
+      this.fieldMenuItem('标题', FeedSearchField.Title, 'search-field-title')
+      this.fieldMenuItem('正文', FeedSearchField.Body, 'search-field-body')
+      this.fieldMenuItem('回帖', FeedSearchField.Reply, 'search-field-reply')
+    }
+    .id('search-field-menu')
+    .width(148)
+    .height(SEARCH_FIELD_MENU_HEIGHT)
+    .padding(Spacing.XS)
+    .backgroundEffect(buildImmersiveGlassEffect(this.glassStyle))
+    .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH, color: $r('app.color.bottom_tab_bar_highlight') })
+    .borderRadius(Radius.LG)
+    .shadow({
+      radius: IMMERSIVE_GLASS_SHADOW_RADIUS,
+      color: $r('app.color.bottom_tab_bar_shadow'),
+      offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
+    })
+    .attributeModifier(buildImmersiveSystemMaterialModifier(this.glassStyle))
+    .clip(true)
+    .translate({ x: Spacing.MD, y: SEARCH_PRIMARY_CONTROL_HEIGHT + Spacing.XS })
+    .zIndex(10)
   }
 
   @Builder
   private searchControls() {
-    Column({ space: Spacing.LG }) {
+    Column() {
+      Stack({ alignContent: Alignment.TopStart }) {
       Row({ space: Spacing.SM }) {
         Row({ space: Spacing.XS }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass'))
-            .fontSize(20)
-            .fontColor([SemanticColors.textSecondary()])
+          Button({ type: ButtonType.Capsule, stateEffect: false }) {
+            Row({ space: Spacing.XXS }) {
+              Text(this.fieldLabel())
+                .fontSize(Typography.BODY_SMALL)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(SemanticColors.textPrimary())
+              SymbolGlyph($r('sys.symbol.chevron_down'))
+                .fontSize(13)
+                .fontColor([SemanticColors.textPrimary()])
+            }
+          }
+          .id('search-field-picker')
+          .accessibilityText(`搜索范围：${this.fieldLabel()}`)
+          .height(32)
+          .padding({ left: Spacing.SM, right: Spacing.SM })
+          .backgroundColor($r('app.color.bottom_tab_selected_bg'))
+          .borderRadius(Radius.PILL)
+          .hoverEffect(HoverEffect.None)
+          .onClick(() => this.chooseField())
           TextInput({ text: this.query, placeholder: '搜索社区帖子' })
             .id('search-input')
             .layoutWeight(1)
@@ -106,7 +184,7 @@ export struct SearchPage {
             .fontSize(Typography.BODY)
             .fontColor(SemanticColors.textPrimary())
             .placeholderColor(SemanticColors.textSecondary())
-            .caretColor($r('app.color.brand_primary'))
+            .caretColor(SemanticColors.textPrimary())
             .padding({ left: 0, right: 0 })
             .backgroundColor(Color.Transparent)
             .enterKeyType(EnterKeyType.Search)
@@ -117,7 +195,7 @@ export struct SearchPage {
         .id('search-input-surface')
         .height(SEARCH_PRIMARY_CONTROL_HEIGHT)
         .padding({ left: Spacing.MD, right: Spacing.SM })
-        .backgroundEffect(buildImmersiveGlassEffect())
+        .backgroundEffect(buildImmersiveGlassEffect(this.glassStyle))
         .border({ width: IMMERSIVE_GLASS_BORDER_WIDTH, color: $r('app.color.bottom_tab_bar_highlight') })
         .borderRadius(Radius.PILL)
         .shadow({
@@ -125,34 +203,29 @@ export struct SearchPage {
           color: $r('app.color.bottom_tab_bar_shadow'),
           offsetY: IMMERSIVE_GLASS_SHADOW_OFFSET_Y
         })
+        .attributeModifier(buildImmersiveSystemMaterialModifier(this.glassStyle))
 
         ImmersiveIconButton({
           icon: $r('sys.symbol.arrow_up'),
           semanticId: 'search-submit',
           semanticLabel: '搜索',
           buttonSize: SEARCH_PRIMARY_CONTROL_HEIGHT,
-          iconSize: GLASS_ACTION_ARROW_ICON_SIZE,
+          iconSize: SEARCH_SEND_ICON_SIZE,
           iconWeight: GLASS_ACTION_ARROW_ICON_WEIGHT,
           iconRotation: 90,
-          iconColor: $r('app.color.brand_primary'),
+          iconColor: SemanticColors.textPrimary(),
           onAction: () => this.search()
         })
       }
       .width('100%')
-
-      Row() {
-        CompactSegmentedControl({
-          options: this.fieldOptions(),
-          selectedIndex: this.fieldIndex(),
-          segmentWidth: SEARCH_FIELD_SEGMENT_WIDTH,
-          controlHeight: SEARCH_FIELD_CONTROL_HEIGHT,
-          labelFontSize: Typography.BODY_SMALL,
-          semanticId: 'search-field-control',
-          onSelect: (index: number) => this.selectField(index)
-        })
-        Blank()
+      if (this.showFieldMenu) {
+        this.fieldMenu()
+      }
       }
       .width('100%')
+      .height(this.showFieldMenu ? SEARCH_PRIMARY_CONTROL_HEIGHT + Spacing.XS + SEARCH_FIELD_MENU_HEIGHT :
+        SEARCH_PRIMARY_CONTROL_HEIGHT)
+      .clip(false)
     }
     .width('100%')
     .padding({ left: Spacing.MD, right: Spacing.MD, top: 0, bottom: Spacing.MD })
@@ -190,6 +263,10 @@ export struct SearchPage {
             .layoutWeight(1)
             .width('100%')
             .justifyContent(FlexAlign.Center)
+            // The hint is lifted over the search controls for visual centering, but
+            // a full-width transparent column still intercepts touches there. Let
+            // every tap fall through so the input and field picker stay clickable.
+            .hitTestBehavior(HitTestMode.None)
             .translate({ y: -SEARCH_EMPTY_HINT_LIFT })
           } else {
             PaginatedTopicList({

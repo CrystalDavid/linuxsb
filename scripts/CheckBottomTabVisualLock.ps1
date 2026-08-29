@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $targetPath = Join-Path $projectRoot 'entry\src\main\ets\views\components\ImmersiveBottomTabBar.ets'
-$expectedSha256 = 'D50D21A0E9E9863CB4F5123EC453717C23C15072DB4979FD96614E06AE67EE65'
+$expectedSha256 = 'BD8B9E19E34DB24694961379BF5F5E3286987AA8BBE96319006164BDFAB5E0C0'
 $source = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
 $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($source)
 $sha256 = [System.Security.Cryptography.SHA256]::Create()
