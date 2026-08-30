@@ -248,9 +248,6 @@ export struct HomePage {
         .position({ x: 0, y: -immersiveTitleBarContentTopSpacer(this.topInset) })
         .clip(false)
         .scrollBar(BarState.Off)
-        // Three rows are enough to hide node creation without decoding a large
-        // second screen of remote avatars during every fast fling.
-        .cachedCount(3)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .onScrollStart(() => {
           this.listIsScrolling = true;

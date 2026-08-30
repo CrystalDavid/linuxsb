@@ -16,10 +16,10 @@
 
 ## 必须保持的架构
 
-- 正常业务：`RCP -> 版本化轻量解码 -> TaskPool -> 领域模型 -> PresentationMapper -> ArkUI`。
+- 正常同源业务：`ArkWeb 同源 fetch -> 版本化轻量解码 -> TaskPool -> 领域模型 -> PresentationMapper -> ArkUI`；ArkWeb 尚未就绪时允许 RCP 作兼容回退，第三方匿名图床仍使用 RCP。
 - Page / Component 不直接解析 HTML、读 Cookie 或绕过 Repository 请求网络。
 - 不构建 DOM，不使用 CSS 选择器，不使用整页正则解码。
-- ArkWeb 只允许出现在 `OfficialLoginPage`，只用于 linux.sb 官方登录；其他页面 Web 节点必须为 0。
+- ArkWeb 只允许在 `services/auth` 中由 `ArkWebTransportHost` 和 `OfficialLoginPage` 创建。正常页面保留 1 个全屏、不可命中、被原生根壳完全遮挡的同源传输宿主；只有官方登录或 Cloudflare 挑战需要用户操作时才允许显示网页。可见业务 UI 不得改成网页容器。
 - Cookie 只保留 `bbs_auth` / `bbs_csrf` 所需的内存 Header，不输出值，不写 Preferences 或文件。
 - 全局复用正式 `RcpForumTransport` / Session，主题页保留缓存、在途去重和立即导航。
 
@@ -88,24 +88,25 @@
 
 安全日志硬性检查：Cookie 值泄露 0、`UI_FALLBACK` 0、Fatal 0、自动化真实 POST 0。
 
-## 当前状态（2026-08-29）
+## 当前状态（2026-08-30）
 
 - M3 四栏原生社区壳、首页独立发布 FAB、蓝色语义主题、首页真实分页、板块筛选、搜索、个人页、发帖编辑器和原生回复栏：`PASS`（实现与模拟器验收）。
 - 主题详情原生排版、头像左/内容右、楼中楼层级、网页“展开全文”控件隔离和图片可视区懒加载：`PASS`。
-- 临时登录关闭顺序：`PASS`；先移除 ArkWeb，下一帧再抓取内存 Cookie 并刷新。手工复验 600ms 后 Profile 节点 1、Web 节点 0；设备自动回归同样通过。
+- Cloudflare 恢复链路：`PASS`（Pura 90 API 24 模拟器）。直连 RCP 复现 `HTTP 403` 与 `Cf-Mitigated: challenge` 后，同源 ArkWeb 传输宿主会先静默恢复；约 12 秒仍未恢复才显示官方挑战页。挑战完成后原生首页自动重载，进程重启后会话仍可复用。
 - 本轮 HDS 根导航/页签、264×56vp 四栏玻璃主栏、单一连续液态指示器和首页右侧同高 56vp 发帖按钮：实现已更新，设备状态以本轮验收记录为准。板块/称号不显示右侧动作并用弹簧动画居中，“我的”右侧改为系统设置按钮。浅色模式保留底层头像与文字色块，深色模式使用低 alpha 冷色采样和细亮边；所有玻璃组件只复用 4vp 通透配方，不再存在奶白选项。
 - 独立设置页与偏好切换：设置不占用个人主页，由“我的”底栏右侧系统齿轮进入。总览以圆角分组显示外观主题和首页帖子样式的当前值；主题详情使用浅色/深色两列大预览与下方独立“跟随系统”开关，帖子样式详情使用两张排版预览。玻璃风格入口已删除，升级时旧奶白值自动迁移为通透。
-- 邀请测试候选版本：`1.1.0 / 1001000`。设置总览新增“投喂开发者 / 反馈”；四档一次性 IAP 弹窗与 `topic/17803` 原生跳转已在 API 24 模拟器可视确认。真实华为收银台交易、AGC 商品配置、release 签名和邀请测试上传仍为 `NOT RUN`，不得由本地弹窗或 HAP 构建推断通过。
+- 邀请测试候选版本：`1.1.1 / 1001001 / build 3`。该版本包含 Cloudflare 同源恢复、头像加载和滑动/切页热路径修复；release 签名 `.app` / `.hap` 已在本地组装并通过签名、Profile 和包内版本校验。设置总览的四档一次性 IAP 弹窗与 `topic/17803` 原生跳转保持不变。真实华为收银台交易、AGC 商品配置、App Pack 上传/解析和邀请测试审核仍为 `NOT RUN`，不得由本地弹窗、签名构建或 HAP 安装推断通过。
 - 发帖登录门禁与官方登录安全区：`PASS`（Pura 90 API 24 设备回归）；未登录门禁固定在标题栏正文区域起点 12vp 内且无容器框，设备断言上限为 16vp；官方登录原生头部按系统顶部 inset 下移并删除旧说明句，标题和完成按钮均通过安全区位置断言。
 - 搜索/回复操作与页面层级：未登录搜索输入/提交/范围控件为 0，只显示与“我的”同尺寸、同位置门禁；登录后搜索文字取消默认内缩，42vp 输入与提交按钮上下边界一致，搜索与回复共用 24vp/800 `arrow_up`，搜索仅旋转 90°；42vp 回复输入与发送按钮上下边界一致，发送端无蓝色圆底且箭头始终使用品牌蓝。四个根页标题为 28vp/Bold，压栈标题为 22vp/Bold，首页、板块目录与板块主题为 17vp/500；本轮设备状态以最新验收记录为准。
-- 原生性审计：常规业务页面、导航、图标、网络、解码与编辑器均为 HarmonyOS 原生实现；唯一非 ArkUI 可见内容是用户主动打开的 linux.sb 官方登录网页。远程头像/正文图片由原生 `Image` 承载；BBS1 HTML 是数据协议，不作为网页 UI 渲染。
+- 原生性审计：常规业务页面、导航、图标、解码与编辑器均为 HarmonyOS 原生实现；正常布局树固定有 1 个被原生根壳完全遮挡的同源传输 Web，唯一可见网页内容是用户主动打开的 linux.sb 官方登录页或 Cloudflare 挑战页。BBS1 HTML 仍只作为数据协议解码，不作为网页 UI 渲染。
 - 普通组件 `.systemMaterial(new uiMaterial.ImmersiveMaterial(...))`：当前 target API 24 **未接入/未运行**；官方起始版本为 26.0.0，必须等 target 26 工具链恢复并留下构建与设备证据后再更新状态，不能从 HDS 能力探测推断。
 - 自动测试历史：删除测试源码前的单元测试 91/91 与模拟器设备测试 13/13 为 `PASS`；当前活动自动测试套件为 `NOT RUN`（源码已按维护者要求移除）。历史覆盖包括四栏居中、单一原生底栏图标、拖动指示器、FAB、设置即时勾选、板块、编辑器、登录关闭、原生详情、42vp 搜索/回复控件和标题切换器居中。
-- `NoWebOutsideLogin`、本轮 Home/板块目录/具体板块/Search/Profile/Topic 六类 `dumpLayout` Web 0、signed HAP 构建/覆盖安装/启动：`PASS`。
-- 模拟器最终应用进程：Fatal 0、`UI_FALLBACK` 0、Cookie 泄露 0、HTTP POST 0。
+- `NoWebOutsideLogin`、底栏视觉锁、signed HAP 构建/覆盖安装/启动：`PASS`。本轮首页恢复后的 `dumpLayout` 为隐藏传输 Web 1、首主题 1、主题项 14、挑战标题 0、错误节点 0；不得再沿用旧的普通页面 Web 0 断言。
+- Pura 90 模拟器与 Mate 80 Pro Max 真机最终应用进程：Fatal 0、`UI_FALLBACK` 0、Cookie 标识符日志 0、HTTP POST 0。
+- Pura 90 API 24 在头像加载期间完成 4 轮双向惯性滑动，并快速切页 12 次；Mate 80 Pro Max API 26 也快速切页 12 次，两台设备的 RenderService `>16.67 / 33 / 66ms` 三档卡顿帧均为 0。真机 HiSmartPerf 首页单次滑动为 `90.6017fps / 36ms / 0.00ms/s / 最大连续丢帧 0`；AppGallery 自动化 90.9ms/s 指标仍需用新包重测。
 - 性能样本：点击到目的页约 9ms，Skeleton 约 26ms，含图主题首段文字约 968ms，TaskPool 解码约 14ms；首图受外部 CDN 影响约 5.06s，现已改为不阻塞正文的可视区懒加载。
 - 真实社区 POST：`NOT RUN`；测试期间未发帖、未回复。
-- API 26 真机本轮最终复验：`NOT RUN`；HDC 重启后仅发现 Pura 90 模拟器，Windows 未枚举到 HDC Interface，不得宣称 M3 真机 PASS。
+- API 26 真机本轮首页头像、滑动和根页面切换专项复验：`PASS`（Mate 80 Pro Max / SGT-AL10 / 本地调试签名 HAP）；这不等同于邀请测试 release 包、AppGallery 自动化任务、支付或整个 M3 发布验收通过。
 
 ## 文档规则
 

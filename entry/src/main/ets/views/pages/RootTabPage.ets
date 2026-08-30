@@ -22,6 +22,8 @@ import { PageMetrics, SemanticColors, Typography } from '../../common/theme/Desi
 import { SYS_BOTTOM_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { TopicUiModel } from '../../models/presentation/ForumUiModels';
 import { PortalAction } from '../../models/PortalModels';
+import { arkWebForumBridge } from '../../services/auth/ArkWebForumBridge';
+import { ArkWebTransportHost } from '../../services/auth/ArkWebTransportHost';
 import { OfficialLoginPage } from '../../services/auth/OfficialLoginPage';
 import { TopicOpenTrace } from '../../services/logging/TopicOpenTrace';
 import { HomePage } from './HomePage';
@@ -50,6 +52,7 @@ function isDebugPackage(): boolean {
 export struct RootTabPage {
   @Provide('appPathStack') private pathStack: NavPathStack = new NavPathStack();
   @State private showOfficialLogin: boolean = false;
+  @State private showCloudflareChallenge: boolean = false;
   @State private loginReturnsToTopic: boolean = false;
   @State private authenticated: boolean = false;
   @State private loginGeneration: number = 0;
@@ -61,6 +64,8 @@ export struct RootTabPage {
   @StorageProp(SYS_BOTTOM_INSET_KEY) private bottomInset: number = 0;
   private tabsController: HdsTabsController = new HdsTabsController();
   private debugPackage: boolean = isDebugPackage();
+  private unsubscribeChallengeRequired: (() => void) | undefined = undefined;
+  private unsubscribeChallengeRecovered: (() => void) | undefined = undefined;
 
   aboutToAppear(): void {
     TopicOpenTrace.configure(this.debugPackage);
@@ -70,6 +75,34 @@ export struct RootTabPage {
     this.authenticated = m1Runtime.restorePersistedSession();
     if (this.authenticated) {
       m1Runtime.verifyActiveSession(true);
+    }
+    this.unsubscribeChallengeRequired = arkWebForumBridge.subscribeChallengeRequired(() => {
+      if (!this.showOfficialLogin) {
+        this.showCloudflareChallenge = true;
+      }
+    });
+    this.unsubscribeChallengeRecovered = arkWebForumBridge.subscribeRecovered(() => {
+      this.handleCloudflareRecovered();
+    });
+  }
+
+  aboutToDisappear(): void {
+    if (this.unsubscribeChallengeRequired !== undefined) {
+      this.unsubscribeChallengeRequired();
+      this.unsubscribeChallengeRequired = undefined;
+    }
+    if (this.unsubscribeChallengeRecovered !== undefined) {
+      this.unsubscribeChallengeRecovered();
+      this.unsubscribeChallengeRecovered = undefined;
+    }
+  }
+
+  private handleCloudflareRecovered(): void {
+    this.showCloudflareChallenge = false;
+    m1Runtime.homeViewModel.load(true);
+    const currentRoute = this.currentTopicRoute();
+    if (currentRoute !== undefined) {
+      m1Runtime.topicViewModel.load(currentRoute.topicId);
     }
   }
 
@@ -461,6 +494,8 @@ export struct RootTabPage {
 
   build() {
     Stack() {
+      ArkWebTransportHost()
+
       HdsNavigation(this.pathStack) {
         this.rootTabContent()
       }
@@ -476,6 +511,19 @@ export struct RootTabPage {
           showDiagnostics: false
         })
           .zIndex(10)
+      }
+
+      if (this.showCloudflareChallenge && !this.showOfficialLogin) {
+        OfficialLoginPage({
+          challengeMode: true,
+          onClose: () => {
+            arkWebForumBridge.dismissChallenge();
+            this.showCloudflareChallenge = false;
+          },
+          onChallengeResolved: () => arkWebForumBridge.confirmChallengeResolved(),
+          showDiagnostics: false
+        })
+          .zIndex(11)
       }
     }
     .id('root-tab-page')

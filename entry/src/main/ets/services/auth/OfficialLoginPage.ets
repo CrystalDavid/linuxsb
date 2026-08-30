@@ -3,13 +3,20 @@ import { AppSpacing, AppTypography } from '../../common/theme/AppTheme';
 import { Typography } from '../../common/theme/DesignSystem';
 import { SYS_TOP_INSET_KEY } from '../../common/ui/ImmersiveWindow';
 import { CookieProbeSummary, cookieSessionBroker } from './CookieSessionBroker';
+import { arkWebForumBridge } from './ArkWebForumBridge';
+import { ArkWebSession } from './ArkWebSession';
 
 const LOGIN_URL = 'https://linux.sb/login';
+const CHALLENGE_URL = 'https://linux.sb/';
+const CLOUDFLARE_CHALLENGE_ORIGIN = 'https://challenges.cloudflare.com';
+const CHALLENGE_POLL_INTERVAL_MS = 2000;
 
 @Component
 export struct OfficialLoginPage {
   onClose: () => void = () => {};
+  onChallengeResolved: () => void = () => {};
   showDiagnostics: boolean = false;
+  challengeMode: boolean = false;
   private controller: webview.WebviewController = new webview.WebviewController('official-login');
   @StorageProp(SYS_TOP_INSET_KEY) private topInset: number = 0;
   @State private authPresent: boolean = false;
@@ -17,8 +24,19 @@ export struct OfficialLoginPage {
   @State private cookieHeaderLength: number = 0;
   @State private blockedRequestCount: number = 0;
   @State private closing: boolean = false;
+  private challengePollTimer: number = -1;
+  private challengeProbeRunning: boolean = false;
+
+  aboutToAppear(): void {
+    webview.WebviewController.initializeWebEngine();
+    ArkWebSession.configureCookies();
+    if (this.challengeMode) {
+      this.startChallengePolling();
+    }
+  }
 
   aboutToDisappear(): void {
+    this.stopChallengePolling();
     try {
       this.controller.stop();
     } catch (_) {
@@ -35,14 +53,19 @@ export struct OfficialLoginPage {
 
   private isTrustedUrl(value: string): boolean {
     const origin = 'https://linux.sb';
-    if (!value.startsWith(origin)) {
-      return false;
+    if (value.startsWith(CLOUDFLARE_CHALLENGE_ORIGIN)) {
+      const cloudflareBoundary = value.charAt(CLOUDFLARE_CHALLENGE_ORIGIN.length);
+      return value.length === CLOUDFLARE_CHALLENGE_ORIGIN.length || cloudflareBoundary === '/' ||
+        cloudflareBoundary === '?' || cloudflareBoundary === '#';
     }
-    if (value.length === origin.length) {
-      return true;
+    if (value.startsWith(origin)) {
+      if (value.length === origin.length) {
+        return true;
+      }
+      const boundary = value.charAt(origin.length);
+      return boundary === '/' || boundary === '?' || boundary === '#';
     }
-    const boundary = value.charAt(origin.length);
-    return boundary === '/' || boundary === '?' || boundary === '#';
+    return false;
   }
 
   private finish(): void {
@@ -53,17 +76,32 @@ export struct OfficialLoginPage {
     this.onClose();
   }
 
+  private pageTitle(): string {
+    return this.challengeMode ? 'Cloudflare 验证' : 'LinuxSB 官方登录';
+  }
+
+  private actionLabel(): string {
+    if (this.closing) {
+      return '正在返回';
+    }
+    return this.challengeMode ? '返回应用' : '完成并返回';
+  }
+
+  private startUrl(): string {
+    return this.challengeMode ? CHALLENGE_URL : LOGIN_URL;
+  }
+
   build() {
     Column() {
       Row({ space: AppSpacing.SM }) {
-        Text('LinuxSB 官方登录')
+        Text(this.pageTitle())
           .id('official-login-title')
           .fontSize(Typography.PAGE_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
 
-        Button(this.closing ? '正在返回' : '完成并返回')
+        Button(this.actionLabel())
           .id('official-login-complete')
           .enabled(!this.closing)
           .onClick(() => this.finish())
@@ -105,11 +143,16 @@ export struct OfficialLoginPage {
           .backgroundColor($r('app.color.surface'))
       }
 
-      Web({ src: LOGIN_URL, controller: this.controller })
+      Web({ src: this.startUrl(), controller: this.controller })
         .javaScriptAccess(true)
         .domStorageAccess(true)
+        .databaseAccess(true)
         .fileAccess(false)
         .onlineImageAccess(true)
+        .imageAccess(true)
+        .mixedMode(MixedMode.All)
+        .cacheMode(CacheMode.Default)
+        .onControllerAttached(() => ArkWebSession.applyUserAgent(this.controller))
         .onLoadIntercept((event) => {
           const trusted = this.isTrustedUrl(event.data.getRequestUrl());
           if (!trusted) {
@@ -120,6 +163,10 @@ export struct OfficialLoginPage {
         .onPageEnd((event) => {
           if (this.isTrustedUrl(event.url)) {
             this.refreshCookieProbe();
+            ArkWebSession.saveCookies();
+            if (this.challengeMode) {
+              this.pollChallenge();
+            }
           }
         })
         .width('100%')
@@ -128,5 +175,33 @@ export struct OfficialLoginPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
+  }
+
+  private startChallengePolling(): void {
+    this.stopChallengePolling();
+    this.challengePollTimer = setInterval(() => this.pollChallenge(), CHALLENGE_POLL_INTERVAL_MS);
+  }
+
+  private stopChallengePolling(): void {
+    if (this.challengePollTimer >= 0) {
+      clearInterval(this.challengePollTimer);
+      this.challengePollTimer = -1;
+    }
+  }
+
+  private async pollChallenge(): Promise<void> {
+    if (!this.challengeMode || this.closing || this.challengeProbeRunning) {
+      return;
+    }
+    this.challengeProbeRunning = true;
+    const resolved = await arkWebForumBridge.canAccessForum();
+    this.challengeProbeRunning = false;
+    if (!resolved || this.closing) {
+      return;
+    }
+    this.closing = true;
+    ArkWebSession.saveCookies();
+    this.stopChallengePolling();
+    this.onChallengeResolved();
   }
 }

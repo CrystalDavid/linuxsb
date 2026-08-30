@@ -1,20 +1,23 @@
 # 安全与隐私规范
 
+适用版本：`1.1.1 / 1001001 / build 3`。
+
 ## 登录与会话
 
 - App 不提供用户名、密码或验证码输入框；用户只在 linux.sb 官方页面登录。
-- ArkWeb 只允许存在于 `OfficialLoginPage`，且只允许 linux.sb 登录流程。
+- ArkWeb 构造器只允许存在于 `OfficialLoginPage` 与 `ArkWebTransportHost`；前者承载 linux.sb 官方登录/挑战，后者只承载被原生根壳完全遮挡的同源请求宿主。
 - 只读取 `bbs_auth` 与 `bbs_csrf` 所需信息，在内存中构造请求 Header。
 - Cookie 不写入 Preferences、文件、数据库或文档，不输出原值、片段或可逆摘要。
-- 登录页关闭后销毁 ArkWeb；普通业务继续通过 RCP 请求。
+- 登录/挑战页关闭后销毁可见 ArkWeb；隐藏宿主与它使用完全一致的 User-Agent 和 ArkWeb Cookie 会话，普通同源业务由浏览器 fetch 继续请求。
 
 ## 网络与写操作
 
-- 读请求由 Repository 通过 `RcpForumTransport` 发起。
+- 读请求由 Repository 通过 `RcpForumTransport` 发起；transport 优先交给 `ArkWebForumBridge` 执行同源 fetch，桥尚未就绪时才使用 RCP 回退。
 - 新主题只允许 POST `/topic_edit`，回复只允许 POST `/reply_edit`，字段必须匹配 BBS1 v8.6.5 契约。
 - 写请求必须同时具备有效内存会话和 CSRF，并且只能由用户在编辑页面明确点击触发。
 - 自动测试只能使用 fake transport，禁止向真实社区创建、编辑或删除内容。
-- 不增加常驻代理、中转服务器或隐藏网页网络桥。
+- 不增加代理或中转服务器。隐藏网页桥只能请求 `https://linux.sb` 同源地址，不接受任意 origin，不向 ArkTS 注入 Cookie Header，也不渲染业务页面。
+- `Cf-Mitigated: challenge` 或挑战 HTML 只能触发静默重载/轮询与官方挑战页，不得自动点击、伪造 token 或绕过人机验证；挑战页外链只额外放行精确 `https://challenges.cloudflare.com`。
 - 图片上传走第三方外链图床（美团图床），该请求必须匿名：不携带 `bbs_auth`/`bbs_csrf` 等论坛 Cookie，也不发送 `_csrf`。`RcpForumTransport` 在图床分支中硬性跳过 Cookie 头，即使调用方误传也不会外泄。
 - 上传目标白名单只允许 linux.sb 附件端点与图床主备端点，其它 URL 一律重写回论坛首页，避免把用户选择的图片发往任意地址。
 - CSRF 取自 `bbs_csrf` Cookie 时必须先做 URL 解码（Cookie 值常以 `%3D` 等形式编码），否则提交会因令牌不一致被服务端拒绝。
@@ -55,7 +58,7 @@
 
 ## 原生边界
 
-`scripts/NoWebOutsideLogin.ps1` 必须通过。新增 `Web`、`WebCookieManager` 或 ArkWeb import 时，必须能证明它位于授权登录边界内；否则视为架构和安全回归。
+`scripts/NoWebOutsideLogin.ps1` 必须通过。Web 构造器只能位于 `OfficialLoginPage.ets` 与 `ArkWebTransportHost.ets`，ArkWeb import 只能位于 `services/auth`；正常布局树只允许 1 个隐藏宿主，挑战/登录可见时才允许临时增加第 2 个 Web。
 
 ## 外部代码与资产
 

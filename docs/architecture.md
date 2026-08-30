@@ -1,8 +1,10 @@
 # 架构规范
 
+适用版本：`1.1.1 / 1001001 / build 3`。
+
 ## 目标与边界
 
-烧饼社区是 LinuxSB 的非官方 HarmonyOS 原生客户端。普通业务页面必须由 ArkUI / UI Design Kit 绘制，网络请求统一走 Remote Communication Kit（RCP）；ArkWeb 仅可作为用户主动打开的官方登录页面，不能成为首页、详情、搜索或个人页的业务容器。
+烧饼社区是 LinuxSB 的非官方 HarmonyOS 原生客户端。普通业务页面必须由 ArkUI / UI Design Kit 绘制。linux.sb 已对原生 RCP 返回 Cloudflare Managed Challenge，因此同源请求改由被原生根壳完全遮挡的 ArkWeb 会话宿主执行；宿主只加载轻量同源 `/robots.txt` 文档，不常驻完整论坛 DOM，且 ArkWeb 不能成为首页、详情、搜索或个人页的可见业务容器。
 
 ```text
 ArkUI Page / Component
@@ -13,6 +15,8 @@ Repository
   ↓
 RcpForumTransport
   ↓
+ArkWebForumBridge（同源 fetch；未就绪时 RCP 回退）
+  ↓
 linux.sb BBS1 HTML
   ↓
 版本化轻量解码器（TaskPool）
@@ -20,18 +24,18 @@ linux.sb BBS1 HTML
 领域模型 → PresentationMapper → ArkUI
 ```
 
-登录是唯一例外：
+登录与挑战恢复：
 
 ```text
 原生登录入口
   ↓
-OfficialLoginPage 中的临时 ArkWeb
+OfficialLoginPage 中的官方登录页 / Cloudflare 挑战页
   ↓
-WebCookieManager 读取 bbs_auth / bbs_csrf
+与 ArkWebTransportHost 共享 User-Agent 和 Cookie 会话
   ↓
-仅在内存中构造 Cookie Header
+浏览器完成挑战并由同源 fetch 自动携带 Cookie
   ↓
-销毁 ArkWeb，普通业务继续走 RCP
+关闭可见网页，原生页面自动重载；隐藏传输宿主继续工作
 ```
 
 ## 目录职责
@@ -42,10 +46,10 @@ WebCookieManager 读取 bbs_auth / bbs_csrf
 | `entry/src/main/ets/views/components/` | 可复用 ArkUI 组件 | 写入业务会话、复制页面级网络逻辑 |
 | `entry/src/main/ets/viewmodels/` | 页面状态与用例编排 | 依赖具体 ArkUI 节点 |
 | `entry/src/main/ets/services/repository/` | 聚合缓存、Transport 与领域模型 | 直接控制页面布局 |
-| `entry/src/main/ets/services/transport/` | RCP 路由、GET/POST 契约、响应指纹 | 输出 Cookie 值、隐式真实写入 |
+| `entry/src/main/ets/services/transport/` | ForumTransport 路由、ArkWeb/RCP 调度、GET/POST 契约、响应指纹 | 输出 Cookie 值、隐式真实写入 |
 | `entry/src/main/ets/services/protocol/` | BBS1 版本化解码、TaskPool 任务 | DOM/CSSOM、CSS 选择器、整页正则解析 |
 | `entry/src/main/ets/services/presentation/` | 领域模型到 UI 模型的映射 | 网络请求和会话管理 |
-| `entry/src/main/ets/services/auth/` | 临时网页登录和内存会话衔接 | 持久化 Cookie、在普通页创建 Web 节点 |
+| `entry/src/main/ets/services/auth/` | 隐藏同源传输宿主、浏览器请求桥、官方登录/挑战与会话衔接 | 让远程网页承担可见业务 UI、向日志输出 Cookie |
 | `entry/src/main/ets/services/payment/` | 华为 IAP 环境检查、一次性商品下单与消耗确认 | 自建支付页面、接触银行卡/支付密码、复用论坛 Cookie |
 | `entry/src/main/ets/common/theme/` | 字号、颜色语义、布局 token | 页面内新增不可追踪的全局常量 |
 | `entry/src/main/ets/common/ui/` | 共享沉浸式材质、标题栏和布局策略 | 为同一控件叠加第二层模糊或不透明底色 |
@@ -55,9 +59,9 @@ WebCookieManager 读取 bbs_auth / bbs_csrf
 - Page / Component 可以依赖 ViewModel、展示模型、主题 token 和共享 UI 组件。
 - ViewModel 可以依赖 Repository，不得依赖具体 Page。
 - Repository 可以依赖 Transport、协议解码、缓存和领域模型。
-- Transport 不得依赖 UI；协议解码不得依赖 ArkWeb。
-- 运行时不引入 React Native、Flutter、uni-app、Cordova、axios 或网页网络桥。
-- 图片是远程内容，但必须由原生 `Image` 承载并进行可视区懒加载。
+- Transport 不得依赖 Page；协议解码不得依赖 ArkWeb。
+- 运行时不引入 React Native、Flutter、uni-app、Cordova 或 axios；唯一网页请求桥为受限在 `services/auth` 的同源 `ArkWebForumBridge`。
+- 图片是远程内容，但最终必须由原生 `Image` 承载；同源头像允许经浏览器会话拉取、PixelMap 解码和有界 LRU 缓存，其它图片继续可视区懒加载。
 - 华为支付是独立系统能力：页面只能调用 `DeveloperSupportService`，该服务只依赖 IAP Kit 与 UIAbility 上下文，不得依赖论坛 Transport、Repository 或会话 Broker。
 
 ## 协议解码
@@ -113,8 +117,8 @@ finishPurchase（一次性消耗型商品）
 
 ## 原生性检查
 
-普通业务页的运行时布局树必须为 Web 节点 0。`scripts/NoWebOutsideLogin.ps1` 是静态边界检查；设备验收还需对首页、板块、搜索、个人页和主题详情执行 `dumpLayout`。
+正常业务页的运行时布局树必须恰有 1 个隐藏传输 Web，且不可命中、被不透明原生根壳完整遮挡；出现可见挑战覆盖层时允许再增加 1 个 Web。`scripts/NoWebOutsideLogin.ps1` 是静态边界检查；设备验收还需用截图与 `dumpLayout` 同时确认原 UI 未变、挑战关闭后恢复为 Web 1。
 
 ## 上游参考
 
-可以在已获授权的范围内参考 ArkDO 固定提交 `7680996437b3b877aa5c69ac2f55529297a2ea52`，但必须保留烧饼社区自己的品牌、BBS1 协议模型、RCP 网络架构与签名配置。不得复制上游证书、密码、Profile、Cookie、截图或未获授权的资产。
+当前 Cloudflare 兼容实现参考 ArkDO 固定提交 `7680996437b3b877aa5c69ac2f55529297a2ea52` 的同源浏览器 fetch、全屏隐藏宿主、静默轮询与挑战回退思路，但保留烧饼社区自己的品牌、BBS1 协议模型、Repository/TaskPool/ArkUI 分层与签名配置。不得复制上游证书、密码、Profile、Cookie、截图或未获授权的资产。

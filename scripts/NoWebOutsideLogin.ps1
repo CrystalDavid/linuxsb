@@ -6,6 +6,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $sourceRoot = Join-Path $projectRoot 'entry\src\main\ets'
 $loginRoot = (Join-Path $sourceRoot 'services\auth')
 $officialLoginPage = (Join-Path $loginRoot 'OfficialLoginPage.ets')
+$transportHost = (Join-Path $loginRoot 'ArkWebTransportHost.ets')
 
 $violations = [System.Collections.Generic.List[string]]::new()
 $sourceFiles = Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Filter '*.ets'
@@ -32,8 +33,9 @@ foreach ($file in $sourceFiles) {
     }
 
     if ($line -match '\bWeb\s*\(' -and
-        -not $fullPath.Equals($officialLoginPage, [System.StringComparison]::OrdinalIgnoreCase)) {
-      $violations.Add("$relativePath`:$lineNumber Web node outside OfficialLoginPage")
+        -not $fullPath.Equals($officialLoginPage, [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $fullPath.Equals($transportHost, [System.StringComparison]::OrdinalIgnoreCase)) {
+      $violations.Add("$relativePath`:$lineNumber Web node outside approved auth/transport hosts")
     }
   }
 }
@@ -43,4 +45,4 @@ if ($violations.Count -gt 0) {
   throw "NoWebOutsideLogin FAIL: $($violations.Count) violation(s)."
 }
 
-Write-Output "NoWebOutsideLogin PASS: ArkWeb imports are confined to services/auth and Web nodes to OfficialLoginPage."
+Write-Output "NoWebOutsideLogin PASS: ArkWeb imports are confined to services/auth; Web nodes are limited to the official login/challenge page and the hidden same-origin transport host."

@@ -41,7 +41,6 @@ export function buildImmersiveTitleBarStyle(
     originalStyle: originalStyle,
     scrollEffectStyle: scrollEffectStyle,
     blurStrategy: BlurStrategy.ENABLE,
-    thermoCtrl: true,
     systemMaterialEffect: emphasizedSystemMaterialEffect()
   };
 }

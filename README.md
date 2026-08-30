@@ -1,8 +1,8 @@
 # 烧饼社区（HarmonyOS）
 
-LinuxSB 的非官方 HarmonyOS 原生客户端。当前邀请测试候选版本为 **1.1.0（versionCode 1001000）**：常规业务界面由 ArkUI / UI Design Kit 绘制，业务请求统一使用 RCP，只有用户主动打开的官方登录页使用临时 ArkWeb。
+LinuxSB 的非官方 HarmonyOS 原生客户端。当前邀请测试候选版本为 **1.1.1（versionCode 1001001，buildVersion 3）**：常规业务界面由 ArkUI / UI Design Kit 绘制；linux.sb 同源请求通过被原生根壳完全遮挡的 ArkWeb 会话宿主执行，以兼容 Cloudflare 挑战，只有官方登录或挑战需要人工操作时才显示网页。
 
-> 当前状态：2026-08-29。活动产品使用 API 24 target、API 23 兼容下限；同一 HAP 需要分别在 Pura 90 API 24 与 API 26 验证。API 26 的通用 `ImmersiveMaterial` 只属于后续 target 26 产品，不能与当前 HDS 能力探测或 API 24 回退混为一谈。
+> 当前状态：2026-08-30。活动产品使用 API 24 target、API 23 兼容下限；1.1.1 源码已在 Pura 90 API 24 模拟器与 Mate 80 Pro Max API 26 真机完成 Cloudflare、头像、首页滑动和根页面切换专项复验。API 26 的通用 `ImmersiveMaterial` 只属于后续 target 26 产品，不能与当前 HDS 能力探测或 API 24 回退混为一谈。
 
 ## 技术路线
 
@@ -11,7 +11,7 @@ ArkUI / UI Design Kit 页面
   ↓
 ViewModel / Repository
   ↓
-RcpForumTransport（Remote Communication Kit）
+RcpForumTransport → ArkWebForumBridge（同源浏览器 fetch；未就绪时 RCP 回退）
   ↓
 linux.sb BBS1 HTML
   ↓
@@ -22,35 +22,35 @@ linux.sb BBS1 HTML
 ArkUI 原生列表、详情、图片、编辑器与导航
 ```
 
-登录是唯一例外：
+登录与 Cloudflare 挑战恢复：
 
 ```text
 原生登录入口
   ↓
-临时 ArkWeb 打开 https://linux.sb/login
+OfficialLoginPage 打开 https://linux.sb/login 或官方挑战页
   ↓
-WebCookieManager 读取 bbs_auth / bbs_csrf
+与隐藏传输宿主共享 User-Agent 和 ArkWeb Cookie 会话
   ↓
-仅在内存中生成 Cookie Header
+挑战通过后由浏览器同源 fetch 携带 Cookie
   ↓
-销毁 ArkWeb，后续业务继续走 RCP
+关闭可见网页，原生页面自动重载；隐藏宿主继续服务同源请求
 ```
 
 ## 原生性审计
 
 | 范围 | 结论 | 说明 |
 | --- | --- | --- |
-| 首页、板块、称号、我的、搜索、设置、发帖、主题详情、回复 | 原生 | 使用 ArkUI 与 `HdsNavigation / HdsTabs / HdsActionBar`，普通页面没有 `Web` 节点 |
+| 首页、板块、称号、我的、搜索、设置、发帖、主题详情、回复 | 原生可见 UI | 使用 ArkUI 与 `HdsNavigation / HdsTabs / HdsActionBar`；隐藏传输 Web 不绘制业务界面且不可命中 |
 | 底部 Tab 图标 | 原生 | 板块/称号/我的使用系统 `SymbolGlyph`；首页使用 ArkUI `Path` 绘制，不使用 SVG 或位图 Tab 图标 |
-| 网络、分页、搜索、写入 | 原生 | 统一使用 Remote Communication Kit；运行时没有 axios、fetch、网页网络桥或第三方跨端框架 |
+| linux.sb 网络、分页、搜索、写入 | 设备内同源浏览器会话 | `ArkWebForumBridge` 注入同源 `fetch`，由 Chromium 管理 Cloudflare 与论坛 Cookie；Repository、解码和 UI 契约不变，RCP 仅作未就绪回退 |
 | HTML 处理 | 原生执行，但数据源是网页协议 | BBS1 HTML 在 TaskPool 中由版本化状态机解码，不加载 CSS、不执行网页 JavaScript、不渲染 DOM |
-| 头像与帖子图片 | 原生组件承载外部内容 | 图片来自网络 CDN，但由 ArkUI `Image` 懒加载和绘制 |
+| 头像与帖子图片 | 原生组件承载外部内容 | 同源头像由浏览器会话拉取后解码为 PixelMap 并以 ArkUI `Image` 绘制；其它 CDN 图片继续由原生 `Image` 懒加载 |
 | 投喂开发者 | 原生华为能力 | ArkUI 底部弹窗选择一次性档位，由 IAP Kit `createPurchase` 打开华为收银台；应用不自建支付页，也不把论坛 Cookie 发送给华为 |
 | 玻璃与沉浸效果 | 原生 ArkUI | 当前 API 23–24 普通组件统一使用 4vp / 1.42 饱和度 / 0.98 亮度 / 低 alpha 冷色 tint 的唯一一层 `backgroundEffect`，深浅模式分别取资源；HDS 标题栏继续能力探测并优先 `ADAPTIVE`。API 26 的通用 `ImmersiveMaterial` 需在 target 26 产品中另行守卫接入，迁移时不得删除当前回退 |
-| 官方登录正文 | **非 ArkUI 页面** | 唯一非原生业务画面：临时 ArkWeb 中的 linux.sb 官方登录网页；关闭后普通页面 Web 节点恢复为 0 |
+| 官方登录 / Cloudflare 挑战正文 | **非 ArkUI 页面** | 只有需要用户登录或完成人机验证时可见；挑战资源仅放行精确 `https://challenges.cloudflare.com`，完成后自动返回原生页面 |
 | 运行时第三方 UI 框架 | 无 | 项目没有 React Native、Flutter、uni-app、Cordova、WebView 套壳依赖；运行时依赖表为空 |
 
-`scripts/NoWebOutsideLogin.ps1` 会阻止 ArkWeb 扩散到普通页面。`CookieSessionBroker` 虽然调用 ArkWeb 的 Cookie 管理器，但它不创建可见界面。
+`scripts/NoWebOutsideLogin.ps1` 将 Web 构造器锁定在 `OfficialLoginPage.ets` 与 `ArkWebTransportHost.ets`，并把 ArkWeb import 限制在 `services/auth`。正常布局树预期只有 1 个隐藏传输 Web；可见业务节点仍全部是 ArkUI。
 
 ## 当前 UI 与细节
 

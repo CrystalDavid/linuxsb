@@ -5,7 +5,7 @@
 - HarmonyOS Stage 模型，ArkTS；当前活动产品使用 DevEco Studio 6.1.1 / API 24 SDK 编译，并要求在更高系统向上兼容运行。
 - `compatibleSdkVersion`：6.1.0（API 23）。
 - `targetSdkVersion`：6.1.1（API 24）。
-- 当前邀请测试候选：`versionName 1.1.0`、`versionCode 1001000`、`buildVersion 2`。
+- 当前邀请测试候选：`versionName 1.1.1`、`versionCode 1001001`、`buildVersion 3`。
 - DevEco Studio / Hvigor 使用开发机本地 SDK；仓库不固定本机绝对路径。
 - 普通组件的 `.systemMaterial()` / `ArkUI_ImmersiveMaterial` 从 API 26.0.0 提供，不能在当前 target 24 源码中假装已经启用。当前 HDS 组件保持能力探测，普通组件保持 API 23–24 单层回退；以后建立 target 26 产品时必须继续保留该回退。
 

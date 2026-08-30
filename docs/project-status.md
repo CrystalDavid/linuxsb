@@ -46,7 +46,13 @@
 
 > 本轮二十二（2026-08-29）更新：邀请测试候选版本升为 `1.1.0 / 1001000`。我的交易页把“交易记录”标题额外下移 8vp，发布卡字段顺序调整为“称号 / 单价 / 状态 / 编号与日期”。设置总览新增第二张两行系统卡片：“投喂开发者”打开 ArkUI 底部弹窗，提供硬币 1 元、水 5 元、咖啡 9.9 元、pro 订阅 50 元四个一次性消耗型华为 IAP 档位；“反馈”进入原生 `topic/17803` 详情。设置卡、四档弹窗、反馈原生路由及我的交易最终排版已在 Pura 90 API 24 模拟器完成浅色可视检查；最终 `assembleHap`、`assembleApp`、NoWeb 与底栏视觉锁均 PASS，1.1.0 HAP 覆盖安装后 `bm dump` 确认为 `1001000 / 1.1.0`，普通页面 Web 节点 0，Fatal、`UI_FALLBACK` 与 Cookie 泄露 0。AGC 只读核对确认现有应用包名已是 `com.david.shaobingcommunity`，1.0.0 测试包合法性已达标且已有测试群组/用户；1.1.0 尚未上传，商品管理为空。本轮没有点击任何金额，真实华为收银台、四个 AGC 商品、支付沙盒、1.1.0 release/托管签名、软件包上传和邀请测试审核均为 `NOT RUN`。文档已同步固定 UI、架构、隐私、安全、支付与发布阶段门。
 
-> 阶段状态（2026-08-29）：P0、P0-B 与 M1 历史验收继续为 PASS，M2-R1 历史状态保持 FAIL。M3 已在 Pura 90 API 24 模拟器完成四栏原生社区壳、主要社区流程、称号中心、个人设置与 1.1.0 设置新增入口；删除测试源码前的 91/91 单元测试和 13/13 设备测试仅为历史 PASS。当前活动自动回归、1.1.0 API 26 真机、华为 IAP 沙盒和邀请测试 release 包仍为 NOT RUN，因此当前只能称为“邀请测试候选源码”，不能宣称发布包、支付或整个 M3 真机通过。
+> 本轮二十三（2026-08-30）更新：实时复现 `https://linux.sb/` 对 RCP 返回 `HTTP 403`、`Cf-Mitigated: challenge`。参考 ArkDO 固定提交 `7680996437b3b877aa5c69ac2f55529297a2ea52`，新增被不透明原生根壳完全遮挡的全屏 ArkWeb 同源传输宿主、浏览器 fetch 桥、有界头像 PixelMap 缓存和“先静默恢复、约 12 秒后显示官方挑战”的闭环；同时修复旧登录白名单阻断 `https://challenges.cloudflare.com` 导致验证无法完成的问题。Pura 90 API 24 模拟器上，首次挑战页能完整显示复选框；人工完成验证后可见挑战 Web 自动关闭，首页出现首主题和 14 个主题项、错误节点 0。强停重启后会话仍复用，首页无需再次挑战；正常布局固定为隐藏 Web 1。隐藏宿主进一步改为只加载同源 `/robots.txt`，空闲 Web renderer RSS 由约 747MiB 降至约 221MiB；最终包冷启动约 2.48 秒时首屏已有 4 个头像图片节点，旧包约 7.20 秒时才有 3 个（实时 feed 不同，只作相对证据）。首页 5 轮双向惯性滑动的 RenderService `>16.67 / 33 / 66ms` 三档均为 0；底栏视觉锁、NoWeb、signed HAP 构建/安装/启动、Fatal 0、`UI_FALLBACK` 0、Cookie 泄露 0、POST 0 均 PASS。UI 几何、字体、底栏和交互未改。AppGallery 90.9ms/s 指标、API 26 与真实 90/120Hz 设备仍为 `NOT RUN`，不能由模拟器结果推断达标。
+
+> 本轮二十四（2026-08-30）更新：针对用户继续反馈的头像慢、首页滑动与切页掉帧，进一步按 ArkDO 的真实热路径移除首页前 12 个头像批量预取与固定 6 行离屏缓存，桥接头像遇到无 CORS 的 CDN 重定向时回退原生 `Image`；共享低 alpha 玻璃删除 `AdaptiveColor.AVERAGE` 的逐帧背景均色，标题栏删除额外 `thermoCtrl`，但保留 ADAPTIVE 材质、4vp / 1.42 / 0.98 参数、全部 UI 几何和冻结底栏源码。Pura 90 API 24 覆盖安装后，约 2.0 秒出现首个真实头像、约 4.0 秒当前可见自定义头像基本到齐；头像加载期间 4 轮双向惯性滑动与 12 次快速切页的 RenderService 三档卡顿帧均为 0。随后同一源码以已授权调试 Profile 安装到 Mate 80 Pro Max（SGT-AL10 / API 26）：约 2.8 秒冷启动截图已显示当前可见自定义头像，HiSmartPerf 单次滑动为 `90.6017fps / 36ms / 0.00ms/s / 最大连续丢帧 0`，12 次快速切页的 RenderService 三档也均为 0；Fatal、`UI_FALLBACK`、Cookie 标识符日志与写路由日志均为 0。AppGallery 自动化评分、邀请测试 release 包、弱网与温控仍未执行。
+
+> 本轮二十五（2026-08-30）更新：邀请测试候选版本升为 `1.1.1 / 1001001 / build 3`，用于交付本轮 Cloudflare、头像加载与滑动/切页修复。release 签名 App Pack `.app` 与本地安装 `.hap` 均已组装，官方 `hap-sign-tool verify-app` 验证成功；嵌入 Profile 为 `release / app_gallery`，包内为 `com.david.shaobingcommunity / 1.1.1 / 1001001 / build 3 / Release / target 24 / compatible 23`，SHA-256 已随交付目录记录。AGC 软件包管理应上传 `.app`，而不是把单个 `.hap` 当作 App Pack；AGC 上传、合法性解析、AppTest 安装和邀请测试审核仍由账号持有人执行。
+
+> 阶段状态（2026-08-30）：P0、P0-B 与 M1 历史验收继续为 PASS，M2-R1 历史状态保持 FAIL。1.1.1 的 Cloudflare 恢复链路与首页头像/滑动/切页修复已在 Pura 90 API 24 模拟器完成候选验证，并在 Mate 80 Pro Max API 26 以本地调试签名 HAP 完成专项性能复验；删除测试源码前的 91/91 单元测试和 13/13 设备测试仅为历史 PASS。当前活动自动回归、AppGallery 自动化流畅性复测、华为 IAP 沙盒、1.1.1 AGC 上传/解析和 AppTest 安装仍为 NOT RUN，因此不能宣称支付、AppGallery 任务或整个 M3 已通过发布验收。
 
 ## 1. 产品定义
 
@@ -55,7 +61,7 @@
 - 产品名：**烧饼社区**
 - 定位：LinuxSB 的非官方第三方 HarmonyOS 客户端
 - 平台基线：HarmonyOS 6.1，API 23
-- 技术栈：ArkTS、Stage 模型、ArkUI、UI Design Kit、Remote Communication Kit、ArkWeb（仅登录）
+- 技术栈：ArkTS、Stage 模型、ArkUI、UI Design Kit、Remote Communication Kit、ArkWeb（同源传输宿主、官方登录与 Cloudflare 挑战）
 - 服务端前提：不修改 linux.sb，不依赖站长安装插件，不建设中转代理服务器
 
 应用不得让用户误以为由 linux.sb 站方发布；非官方身份声明保留在关于、登录说明等合适位置，但正式首页不再永久展示“非官方客户端”副标题。
@@ -90,9 +96,9 @@ ViewModel / Service
   ↓
 Repository
   ↓
-ForumTransport（正式实现只有 RcpForumTransport）
+ForumTransport（正式实现为 RcpForumTransport）
   ↓
-RCP 原生 HTTP
+ArkWebForumBridge 同源 fetch（未就绪时 RCP 回退）
   ↓
 BBS1 版本化单遍协议解码
   ↓
@@ -101,34 +107,34 @@ Topic / Reply / User 等领域模型
 ArkUI 原生绘制
 ```
 
-登录链路：
+登录 / Cloudflare 挑战链路：
 
 ```text
 ArkUI 点击登录
   ↓
-临时 LoginWebPage（ArkWeb，加载 linux.sb 官方登录页）
+OfficialLoginPage（ArkWeb，加载 linux.sb 官方登录页或挑战页）
   ↓
-网站写入 bbs_auth / bbs_csrf Cookie
+网站 / Cloudflare 写入同源 Cookie
   ↓
-CookieSessionBroker 仅在内存中读取所需 Cookie
+与 ArkWebTransportHost 共享完全一致的 User-Agent 和 Cookie 会话
   ↓
-关闭登录页
+关闭可见网页登录/挑战页
   ↓
-后续业务继续统一走 RCP
+原生页面自动重载，隐藏宿主继续执行同源 fetch
 ```
 
-**这不是两套并行方案。** ArkWeb 不承担首页、主题详情或普通业务请求；它只是官方登录入口。正常业务阶段不得保留常驻隐藏 ArkWeb。
+**这仍然不是网页套壳。** ArkWeb 承担 linux.sb 同源请求会话，但不承担首页、主题详情或普通业务页面的可见 UI；页面结构、状态、解码、缓存、导航和交互仍由 Repository / TaskPool / ArkUI 控制。
 
 ### 2.2 为什么选择它
 
-- 相比全 ArkWeb 请求桥：冷启动、内存、请求调度和长期复杂度更低；
+- 相比直接显示整站网页：业务 UI、导航、列表复用、缓存与大屏布局仍由 ArkUI 控制；
 - 相比网页套壳：可见内容由 ArkUI 绘制，导航、列表、缓存和大屏体验可控；
 - 相比 CSS/DOM 提取：解码器不建立 DOM、CSSOM，不执行网页脚本，也不进行网页布局和绘制；
 - 相比自建代理：用户 Cookie 不离开设备，没有额外服务器、隐私责任和中转延迟。
 
-### 2.3 P0 真机结论与冻结范围
+### 2.3 P0 真机历史结论与当前变更
 
-API 26 真机已经验证：
+以下是 2026-08-26 的历史 API 26 真机证据，发生在 Cloudflare 开始阻断 RCP 之前：
 
 1. RCP 匿名首页与公开主题 GET 成功；
 2. 单遍轻量解码和 TaskPool 可稳定提取首页与主题核心字段；
@@ -139,7 +145,7 @@ API 26 真机已经验证：
 7. 首页解析处于可用但待优化区间，主题解析处于绿色区间；没有 `UI_FALLBACK`。
 8. 匿名 Topic 605 由 `replies_login_visible` 服务端结构隐藏回复；登录后同一 `/topic/605` GET 稳定返回 5 个回复容器，无需额外 GET、AJAX、POST 或 ArkWeb 数据桥。
 
-因此只读主架构正式冻结为：RCP GET → 版本化轻量解码 → TaskPool → ArkUI；登录继续只使用临时 ArkWeb → Cookie 内存桥接 → RCP。不得再讨论常驻隐藏 ArkWeb或网页套壳作为替代方案。
+该历史冻结已被 2026-08-30 的真实 `Cf-Mitigated: challenge` 与用户明确要求参考 ArkDO 解决所取代。当前主架构为：受限同源 ArkWeb fetch → 版本化轻量解码 → TaskPool → ArkUI；网页套壳仍被禁止。
 
 截至 M2-R1.1，真实写操作仍未授权且功能固定禁用。M3 任务已由用户明确扩展为原生发帖与回复；实现只能使用 BBS1 v8.6.5 已核对的 `/topic_edit` 和 `/reply_edit` 表单契约，必须有内存登录态、CSRF 与用户明确点击。自动化不得代替用户发送真实社区内容。
 
@@ -243,22 +249,22 @@ M3 不改变已冻结的 RCP / 轻量解码 / TaskPool / ArkUI 架构，仅扩�
 
 M3 当前是已通过模拟器的候选版。在 API 26 真机重连且完成最终复验前，不将整个 M3 宣称为 PASS；真实发帖/回复只能由用户在 App 中明确确认。
 
-### 2.9 原生性审计（2026-08-26）
+### 2.9 原生性审计（2026-08-30）
 
 本节把“鸿蒙原生组件”“外部内容”和“网页界面”分开判断，避免把网络图片或 HTML 数据源误判成网页套壳。
 
 | 审计范围 | 结论 | 代码证据与边界 |
 | --- | --- | --- |
-| 正式页面与导航 | 原生 | Home、Forums、Search、Profile、Settings、Compose、TopicDetail 均由 ArkUI 和 UI Design Kit 构建；根壳使用 `HdsNavigation / HdsTabs`，普通页面 `Web` 节点为 0 |
+| 正式页面与导航 | 原生可见 UI | Home、Forums、Search、Profile、Settings、Compose、TopicDetail 均由 ArkUI 和 UI Design Kit 构建；根壳使用 `HdsNavigation / HdsTabs`，隐藏传输 Web 不绘制业务界面且不可命中 |
 | 底栏与操作图标 | 原生 | 三枚系统 `SymbolGlyph` 加一枚 ArkUI `Path` 首页图标；不存在 SVG、HTML 或位图 Tab 图标。`Path` 是原生绘制，但首页字形并非系统内置 Symbol |
 | 玻璃与沉浸材质 | 原生 ArkUI | 当前工程 target API 24、compatible API 23；普通控件使用唯一一层 `backgroundEffect`，HDS 标题栏按能力探测选择系统材质。API 26 通用 `ImmersiveMaterial` 需另由 target 26 构建验证。当前路径均为原生 ArkUI，不使用网页或跨端渲染。 |
-| 网络与协议转换 | 原生执行 | 唯一正式 Transport 为 Remote Communication Kit；BBS1 HTML 在 TaskPool 中由版本化单遍状态机解码，不构建 DOM/CSSOM、不执行网页脚本、不使用 ArkWeb 网络桥 |
-| 头像与帖子图片 | 原生组件 + 外部媒体 | URL 来自 linux.sb/CDN，但显示组件是 ArkUI `Image`，使用原生懒加载与失败回退；外部图片内容本身不等于非原生页面 |
-| 官方登录正文 | **唯一非 ArkUI 可见内容** | `OfficialLoginPage.ets` 中唯一一个 `Web` 节点加载 `https://linux.sb/login`；其头部与关闭按钮仍为 ArkUI。此临时网页只负责官方账号登录，关闭后销毁 |
-| Cookie 衔接 | 平台原生服务，非可见 UI | `CookieSessionBroker.ets` 调用 ArkWeb `WebCookieManager` 读取必要 Cookie，并只在内存中交给 RCP；它不创建页面 |
+| 网络与协议转换 | 设备内同源浏览器会话 + 原生解码 | `ArkWebForumBridge` 只对 `https://linux.sb` 执行同源 fetch；BBS1 HTML 仍在 TaskPool 中由版本化单遍状态机解码，不构建 DOM/CSSOM、不把网页交给 UI |
+| 头像与帖子图片 | 原生组件 + 外部媒体 | 同源头像由浏览器会话拉取、解码为 PixelMap 后交给 ArkUI `Image`；其它 CDN 图片继续由原生 `Image` 懒加载与失败回退 |
+| 官方登录 / 挑战正文 | **唯一非 ArkUI 可见内容** | `OfficialLoginPage.ets` 加载 `https://linux.sb/login` 或首页挑战；其头部与关闭按钮仍为 ArkUI，完成后销毁可见 Web |
+| 隐藏传输宿主 | 非可见网络能力 | `ArkWebTransportHost.ets` 为全屏同源 Web，但位于不透明原生根壳之后、透明且不可命中；正常布局树固定 Web 1 |
 | 运行时第三方框架 | 无 | `oh-package.json5` 与 `entry/oh-package.json5` 的运行时 dependencies 为空；无 React Native、Flutter、uni-app、Cordova、axios 或自带 WebView 套壳 |
 
-源码门禁 `scripts/NoWebOutsideLogin.ps1` 已通过：ArkWeb import 仅位于 `services/auth`，`Web` 构造器仅位于 `OfficialLoginPage.ets`。因此，若把“原生”定义为“全部可见内容均为 ArkUI”，当前唯一例外就是官方登录网页；若把“原生”定义为“使用 HarmonyOS 平台组件”，ArkWeb 本身也是系统组件，但其中呈现的站点登录正文仍然是网页而非 ArkUI。
+源码门禁 `scripts/NoWebOutsideLogin.ps1` 已通过：ArkWeb import 仅位于 `services/auth`，`Web` 构造器仅位于 `OfficialLoginPage.ets` 与 `ArkWebTransportHost.ets`。可见业务内容仍全部是 ArkUI；唯一可见网页例外是官方登录或 Cloudflare 挑战正文。
 
 ## 3. 协议适配原则
 
@@ -385,13 +391,13 @@ contracts/fixtures/              合成或脱敏协议样本，不提交真实 C
 - Repository 不依赖 ArkUI；
 - DTO/协议对象不得直接进入 UI；
 - 所有站点请求只经过 `ForumTransport`；
-- 当前正式业务实现只允许 `RcpForumTransport`；
-- ArkWeb 只允许出现在 `services/auth` 与登录页面。
+- 当前正式 `ForumTransport` 实现只允许 `RcpForumTransport`，其同源请求可委托 `ArkWebForumBridge`；
+- ArkWeb import 只允许出现在 `services/auth`，Web 构造器只允许位于登录/挑战页与隐藏传输宿主。
 
 ### 6.2 安全
 
 - 不记录账号、密码、Cookie 值、CSRF 值、完整私密正文；
-- 登录页只加载受信任的 `https://linux.sb/` 域名，外链转系统浏览器；
+- 登录/挑战页只加载受信任的 `https://linux.sb/` 与精确 `https://challenges.cloudflare.com`；其它外链不得在应用 Web 内打开；
 - Cookie 仅在必要时驻留内存；
 - P0 默认禁止真实 POST；
 - 可共享 `build-profile.json5` 不保存开发机证书路径、Profile 路径、keystore 路径或密码；本地签名只在 DevEco Studio/开发机配置，不提交真实签名证书、Profile、私钥与密码；
@@ -402,7 +408,7 @@ contracts/fixtures/              合成或脱敏协议样本，不提交真实 C
 P0 先记录真实数据，正式阶段目标如下：
 
 - 缓存首页首屏尽快可见，随后无感刷新；
-- 正常浏览时 ArkWeb 实例为 0；
+- 正常浏览时 ArkWeb 实例固定为 1 个隐藏传输宿主；登录/挑战显示时最多为 2；
 - 首页和主题解析不阻塞 UI；
 - 同时网络请求不超过 4 个；
 - 列表使用懒加载和精准更新；
@@ -429,10 +435,9 @@ P0 只读主链路、P0-B 同页回复契约与 M1 只读纵向闭环均已通�
 
 ### 不通过
 
-- RCP 被站点/WAF 阻断；
-- 无法从官方登录页安全获得可用于 RCP 的会话；
-- 登录后 RCP 始终不被服务器认可；
+- 浏览器同源桥与用户完成官方挑战后仍被站点/WAF 阻断；
+- 无法在不读取密码/验证码、不伪造挑战 token 的前提下获得可用会话；
 - 回复只能通过未经授权的 POST、执行远程 JavaScript或不稳定私有接口获得；
 - 写操作协议无法在不绕过安全机制的前提下成立。
 
-出现以上任一情况，Codex 必须停止扩展产品功能，生成证据报告。下一步是联系站长安装最小 API 插件，而不是偷偷切换为网页套壳或长期隐藏 ArkWeb 业务桥。
+出现以上任一情况，Codex 必须停止扩展产品功能并生成证据报告。下一步是联系站长调整 Cloudflare 规则或提供最小 API；不得自动点击验证码、伪造挑战 token、建设中转代理或把应用改成可见网页套壳。

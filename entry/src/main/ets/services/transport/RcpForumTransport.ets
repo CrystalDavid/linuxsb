@@ -11,6 +11,7 @@ import {
   TransportUploadFile
 } from './ForumTransport';
 import { ResponseFingerprint } from './ResponseFingerprint';
+import { arkWebForumBridge } from '../auth/ArkWebForumBridge';
 
 const FORUM_ORIGIN = 'https://linux.sb';
 const PROBE_USER_AGENT = 'ShaobingCommunity-P0/0.1 (HarmonyOS; technical-probe)';
@@ -76,6 +77,9 @@ export class RcpForumTransport implements ForumTransport {
   }
 
   cancelAll(): void {
+    // ArkWeb requests are completed by the shared browser bridge. Reloading the
+    // host is reserved for Cloudflare recovery, so page-level cancellation only
+    // cancels the legacy RCP fallback below.
     const currentSession = this.session;
     if (currentSession === undefined) {
       return;
@@ -109,6 +113,13 @@ export class RcpForumTransport implements ForumTransport {
 
   private async get(url: string, cookieHeader: string,
     cachePolicy: TransportCachePolicy, allowConditional: boolean = false): Promise<TransportProbeResponse> {
+    // Cloudflare binds its clearance to a browser fingerprint. Prefer the
+    // shared ArkWeb fetch context; retain RCP only as a startup/network fallback
+    // for environments where the system Web engine cannot initialize.
+    const webResponse = await arkWebForumBridge.get(url, cachePolicy);
+    if (webResponse !== undefined) {
+      return webResponse;
+    }
     const startedAt = Date.now();
     const session = this.ensureSession();
     if (session === undefined) {
@@ -218,6 +229,13 @@ export class RcpForumTransport implements ForumTransport {
     cookieHeader: string): Promise<TransportProbeResponse> {
     const url = this.validatedWriteUrl(pageUrl);
     const startedAt = Date.now();
+    // Keep user-initiated writes in the same browser identity as reads. The
+    // hidden bridge carries ArkWeb's own Cookie jar; cookieHeader is used only
+    // by the RCP fallback and is never exposed to injected JavaScript.
+    const webResponse = await arkWebForumBridge.postForm(url, fields);
+    if (webResponse !== undefined) {
+      return webResponse;
+    }
     const session = this.ensureSession();
     if (session === undefined) {
       return this.failedResponse(url, startedAt, 'UNKNOWN', 0, 'Unable to create the RCP session.');

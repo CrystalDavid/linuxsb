@@ -31,7 +31,6 @@ export function buildBottomTabGlassEffect(): BackgroundEffectOptions {
     color: $r('app.color.bottom_tab_bar_bg'),
     saturation: BOTTOM_TAB_GLASS_SATURATION,
     brightness: BOTTOM_TAB_GLASS_BRIGHTNESS,
-    adaptiveColor: AdaptiveColor.AVERAGE,
     policy: BlurStyleActivePolicy.ALWAYS_ACTIVE,
     inactiveColor: $r('app.color.bottom_tab_bar_bg')
   };
@@ -84,9 +83,10 @@ export function buildImmersiveGlassEffect(
     color: resolvedTint,
     saturation: saturation ?? preset.saturation,
     brightness: brightness ?? preset.brightness,
-    // AVERAGE keeps the sampled colour of the feed instead of lifting every
-    // light scene toward the same grey-white fallback surface.
-    adaptiveColor: AdaptiveColor.AVERAGE,
+    // Keep the established low-alpha tint static. The adaptive average mode
+    // asks RenderService to recalculate the sampled mean colour whenever feed or
+    // transition content changes; that extra per-frame pass was visible as
+    // scroll and tab-switch jank on the Pura 90 emulator.
     policy: BlurStyleActivePolicy.ALWAYS_ACTIVE,
     inactiveColor: resolvedTint
   };
